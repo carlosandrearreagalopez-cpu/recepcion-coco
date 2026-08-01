@@ -189,6 +189,15 @@ elif st.session_state["nav_state"] == "form":
     mostrar_logo(140)
     st.title("Registro de Recepción de Coco")
     
+    # Proveedor fuera del form principal para que reaccione al instante en móviles
+    st.markdown("### Selección de Proveedor")
+    proveedor_opcion = st.selectbox("Nombre del proveedor", ["GRANOS BASICOS LA PATRONA SOCIEDAD ANONIMA", "Otro"])
+    proveedor_final = ""
+    if proveedor_opcion == "Otro":
+        proveedor_final = st.text_input("Escriba el nombre del nuevo proveedor:")
+
+    st.markdown("---")
+
     with st.form("form_coco"):
         st.header("1. Datos Generales")
         c1, c2, c3 = st.columns(3)
@@ -200,12 +209,6 @@ elif st.session_state["nav_state"] == "form":
             desc_materia = st.text_input("Descripción de materia prima", value="Coco")
         with c2:
             fecha = st.date_input("Fecha")
-            proveedor_opcion = st.selectbox("Nombre del proveedor", ["GRANOS BASICOS LA PATRONA SOCIEDAD ANONIMA", "Otro"])
-            if proveedor_opcion == "Otro":
-                proveedor_final = st.text_input("Especifique el proveedor nuevo")
-            else:
-                proveedor_final = proveedor_opcion
-                
             total_fruta = st.number_input("Total de Fruta Ingresada Planta", min_value=0.0, value=0.0)
         with c3:
             hora = st.time_input("Hora")
@@ -238,6 +241,9 @@ elif st.session_state["nav_state"] == "form":
         submitted = st.form_submit_button("Guardar y Enviar a Revisión", type="primary")
         
         if submitted:
+            # Definir el proveedor final según la selección de afuera
+            proveedor_a_guardar = proveedor_final if proveedor_opcion == "Otro" else proveedor_opcion
+            
             if proveedor_opcion == "Otro" and not proveedor_final.strip():
                 st.error("Por favor, ingrese el nombre del nuevo proveedor.")
             else:
@@ -249,7 +255,7 @@ elif st.session_state["nav_state"] == "form":
                     "Hora": str(hora),
                     "Desc_Materia": desc_materia, 
                     "Observaciones": observaciones,
-                    "Proveedor": proveedor_final, 
+                    "Proveedor": proveedor_a_guardar, 
                     "Total_Fruta": total_fruta, 
                     "Cant_Unidades": cant_unidades,
                     "unidades_galon_1": ug_1, "volumen_1": v_1, "brix_1": b_1, "ph_1": ph_1,
