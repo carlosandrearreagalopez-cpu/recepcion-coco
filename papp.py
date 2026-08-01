@@ -79,7 +79,6 @@ def generar_pdf_relleno(registro):
     doc = fitz.open(PDF_PLANTILLA)
     pagina = doc[0]
     
-    # Coordenadas (X, Y) basadas en el formato PDF oficial
     coordenadas = {
         "Responsable": (180, 150),
         "Fecha": (450, 150),
@@ -109,12 +108,10 @@ def generar_pdf_relleno(registro):
         "ph_3": (180, 590),
     }
 
-    # Escribir textos en el PDF
     for campo, coord in coordenadas.items():
         valor = str(registro.get(campo, ""))
         pagina.insert_text(coord, valor, fontsize=9, color=(0, 0, 0))
 
-    # Insertar la firma del Jefe de Calidad si existe
     nombre_firma = registro.get("Firma_Jefe", "Sin firma")
     ruta_firma = os.path.join(FIRMAS_DIR, str(nombre_firma))
     
@@ -126,9 +123,13 @@ def generar_pdf_relleno(registro):
     doc.close()
     return pdf_bytes
 
-# Control de navegación en la sesión
+# Control de navegación y estados de sesión
 if "nav_state" not in st.session_state: 
     st.session_state["nav_state"] = "home"
+if "form_logueado" not in st.session_state:
+    st.session_state["form_logueado"] = False
+if "admin_logueado" not in st.session_state:
+    st.session_state["admin_logueado"] = False
 
 # ==========================================
 # 1. PANTALLA DE INICIO
@@ -143,7 +144,7 @@ if st.session_state["nav_state"] == "home":
         st.markdown("<br>", unsafe_allow_html=True)
         
         if st.button("📝 Colaborador: Reportar nuevo ingreso", use_container_width=True, type="primary"):
-            st.session_state["nav_state"] = "form"
+            st.session_state["nav_state"] = "form_login"
             st.rerun()
             
         st.markdown("<br>", unsafe_allow_html=True)
@@ -152,10 +153,36 @@ if st.session_state["nav_state"] == "home":
             st.rerun()
 
 # ==========================================
-# 2. FORMULARIO DEL COLABORADOR
+# 2. LOGIN PARA EL NUEVO INGRESO (COLABORADOR)
+# ==========================================
+elif st.session_state["nav_state"] == "form_login":
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("⬅️ Volver al inicio"):
+            st.session_state["nav_state"] = "home"
+            st.rerun()
+        st.title("Acceso a Registro")
+        st.markdown("Ingrese la contraseña autorizada para reportar un nuevo ingreso:")
+        
+        password_form = st.text_input("Contraseña de ingreso", type="password")
+        if st.button("Verificar Acceso", use_container_width=True, type="primary"):
+            if password_form == "20lf26":
+                st.session_state["form_logueado"] = True
+                st.session_state["nav_state"] = "form"
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta.")
+
+# ==========================================
+# 3. FORMULARIO DEL COLABORADOR
 # ==========================================
 elif st.session_state["nav_state"] == "form":
+    if not st.session_state["form_logueado"]:
+        st.session_state["nav_state"] = "form_login"
+        st.rerun()
+        
     if st.button("⬅️ Volver al inicio"):
+        st.session_state["form_logueado"] = False
         st.session_state["nav_state"] = "home"
         st.rerun()
     
@@ -187,7 +214,6 @@ elif st.session_state["nav_state"] == "form":
         
         st.header("2. Parámetros Fisicoquímicos")
         
-        # Muestra 1
         st.subheader("Muestra 1")
         mc1_1, mc1_2, mc1_3, mc1_4 = st.columns(4)
         with mc1_1: ug_1 = st.number_input("Unidades/Galón (M1)", min_value=0.0, value=0.0, key="ug_1")
@@ -195,7 +221,6 @@ elif st.session_state["nav_state"] == "form":
         with mc1_3: b_1 = st.number_input("Brix° (5-5.9) (M1)", min_value=0.0, value=0.0, key="b_1", format="%.2f")
         with mc1_4: ph_1 = st.number_input("pH (M1)", min_value=0.0, value=0.0, key="ph_1", format="%.2f")
 
-        # Muestra 2
         st.subheader("Muestra 2")
         mc2_1, mc2_2, mc2_3, mc2_4 = st.columns(4)
         with mc2_1: ug_2 = st.number_input("Unidades/Galón (M2)", min_value=0.0, value=0.0, key="ug_2")
@@ -203,7 +228,6 @@ elif st.session_state["nav_state"] == "form":
         with mc2_3: b_2 = st.number_input("Brix° (5-5.9) (M2)", min_value=0.0, value=0.0, key="b_2", format="%.2f")
         with mc2_4: ph_2 = st.number_input("pH (M2)", min_value=0.0, value=0.0, key="ph_2", format="%.2f")
 
-        # Muestra 3
         st.subheader("Muestra 3")
         mc3_1, mc3_2, mc3_3, mc3_4 = st.columns(4)
         with mc3_1: ug_3 = st.number_input("Unidades/Galón (M3)", min_value=0.0, value=0.0, key="ug_3")
@@ -239,26 +263,29 @@ elif st.session_state["nav_state"] == "form":
                 st.success("¡Registro enviado con éxito! Quedará pendiente de validación por el Jefe de Calidad.")
 
 # ==========================================
-# 3. LOGIN DE ADMINISTRADOR
+# 4. LOGIN DE ADMINISTRADOR
 # ==========================================
 elif st.session_state["nav_state"] == "admin_login":
-    if st.button("⬅️ Volver al inicio"):
-        st.session_state["nav_state"] = "home"
-        st.rerun()
-        
-    st.title("Acceso - Panel de Administrador")
-    password_input = st.text_input("Contraseña de Administrador", type="password")
-    
-    if st.button("Verificar Acceso", type="primary"):
-        if password_input == "glad726lif":  
-            st.session_state["admin_logueado"] = True
-            st.session_state["nav_state"] = "admin_dashboard"
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("⬅️ Volver al inicio"):
+            st.session_state["nav_state"] = "home"
             st.rerun()
-        else:
-            st.error("Contraseña incorrecta.")
+            
+        st.title("Panel de Administrador")
+        st.markdown("Ingrese la contraseña de administrador para acceder a los registros y reportes.")
+        
+        password_input = st.text_input("Contraseña de administrador", type="password")
+        if st.button("Verificar Acceso", use_container_width=True, type="primary"):
+            if password_input == "glad726lif":  
+                st.session_state["admin_logueado"] = True
+                st.session_state["nav_state"] = "admin_dashboard"
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta.")
 
 # ==========================================
-# 4. DASHBOARD DEL ADMINISTRADOR
+# 5. DASHBOARD DEL ADMINISTRADOR
 # ==========================================
 elif st.session_state["nav_state"] == "admin_dashboard":
     if not st.session_state.get("admin_logueado", False):
@@ -283,7 +310,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             "📊 Total de Registros (Filtros)"
         ])
         
-        # PESTAÑA 1: PENDIENTES DE VALIDAR Y FIRMAR
         with tab_pendientes:
             df_pendientes = df[df["Estado"] == "Pendiente"]
             if df_pendientes.empty:
@@ -324,7 +350,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                             else:
                                 st.warning("Por favor dibuje la firma antes de validar.")
 
-        # PESTAÑA 2: APROBADOS
         with tab_aprobados:
             st.subheader("Registros aprobados y listos")
             df_aprobados = df[df["Estado"] == "Aprobado"]
@@ -333,7 +358,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             else:
                 st.dataframe(df_aprobados[["ID_Registro", "Fecha", "Proveedor", "Responsable", "Estado"]], use_container_width=True)
 
-        # PESTAÑA 3: TOTAL DE REGISTROS (CON FILTROS Y DESCARGA)
         with tab_todos:
             st.subheader("Historial Completo de Registros")
             
