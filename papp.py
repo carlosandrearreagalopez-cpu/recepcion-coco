@@ -119,7 +119,6 @@ def generar_pdf_relleno(registro):
     ruta_firma = os.path.join(FIRMAS_DIR, str(nombre_firma))
     
     if nombre_firma != "Sin firma" and os.path.exists(ruta_firma):
-        # Rectángulo ubicado justo encima de la línea "Jefe de Calidad" al pie de página
         rectangulo_firma = fitz.Rect(230, 680, 380, 730)
         pagina.insert_image(rectangulo_firma, filename=ruta_firma)
 
@@ -167,32 +166,56 @@ elif st.session_state["nav_state"] == "form":
         st.header("1. Datos Generales")
         c1, c2, c3 = st.columns(3)
         with c1:
-            responsable = st.text_input("Nombre del responsable")
-            desc_materia = st.text_input("Descripción de materia prima")
+            responsable = st.selectbox(
+                "Nombre del responsable", 
+                ["Carlos Canto", "Carlos Rodas", "Jonathan", "Damarias Arellanos", "Carlos López", "Marlon Escobar"]
+            )
+            desc_materia = st.text_input("Descripción de materia prima", value="Coco")
         with c2:
             fecha = st.date_input("Fecha")
-            proveedor = st.text_input("Nombre del proveedor")
-            total_fruta = st.number_input("Total de Fruta Ingresada Planta", min_value=0.0)
+            proveedor_opcion = st.selectbox("Nombre del proveedor", ["GRANOS BASICOS LA PATRONA SOCIEDAD ANONIMA", "Otro"])
+            if proveedor_opcion == "Otro":
+                proveedor_final = st.text_input("Especifique el proveedor nuevo")
+            else:
+                proveedor_final = proveedor_opcion
+                
+            total_fruta = st.number_input("Total de Fruta Ingresada Planta", min_value=0.0, value=0.0)
         with c3:
             hora = st.time_input("Hora")
-            observaciones = st.text_area("Observaciones")
-            cant_unidades = st.number_input("Cantidad Unidades (Muestra)", min_value=0.0)
+            observaciones = st.text_area("Observaciones", value="Ninguna")
+            cant_unidades = st.number_input("Cantidad Unidades (Muestra)", min_value=0.0, value=0.0)
         
         st.header("2. Parámetros Fisicoquímicos")
-        muestras = {}
-        for i in range(1, 4):
-            st.subheader(f"Muestra {i}")
-            mc1, mc2, mc3, mc4 = st.columns(4)
-            with mc1: muestras[f"unidades_galon_{i}"] = st.number_input(f"Unidades/Galón (M{i})", key=f"ug_{i}")
-            with mc2: muestras[f"volumen_{i}"] = st.number_input(f"Volumen (M{i})", key=f"v_{i}")
-            with mc3: muestras[f"brix_{i}"] = st.number_input(f"Brix° (5-5.9) (M{i})", key=f"b_{i}", format="%.2f")
-            with mc4: muestras[f"ph_{i}"] = st.number_input(f"pH (M{i})", key=f"ph_{i}", format="%.2f")
+        
+        # Muestra 1
+        st.subheader("Muestra 1")
+        mc1_1, mc1_2, mc1_3, mc1_4 = st.columns(4)
+        with mc1_1: ug_1 = st.number_input("Unidades/Galón (M1)", min_value=0.0, value=0.0, key="ug_1")
+        with mc1_2: v_1 = st.number_input("Volumen (M1)", min_value=0.0, value=0.0, key="v_1")
+        with mc1_3: b_1 = st.number_input("Brix° (5-5.9) (M1)", min_value=0.0, value=0.0, key="b_1", format="%.2f")
+        with mc1_4: ph_1 = st.number_input("pH (M1)", min_value=0.0, value=0.0, key="ph_1", format="%.2f")
+
+        # Muestra 2
+        st.subheader("Muestra 2")
+        mc2_1, mc2_2, mc2_3, mc2_4 = st.columns(4)
+        with mc2_1: ug_2 = st.number_input("Unidades/Galón (M2)", min_value=0.0, value=0.0, key="ug_2")
+        with mc2_2: v_2 = st.number_input("Volumen (M2)", min_value=0.0, value=0.0, key="v_2")
+        with mc2_3: b_2 = st.number_input("Brix° (5-5.9) (M2)", min_value=0.0, value=0.0, key="b_2", format="%.2f")
+        with mc2_4: ph_2 = st.number_input("pH (M2)", min_value=0.0, value=0.0, key="ph_2", format="%.2f")
+
+        # Muestra 3
+        st.subheader("Muestra 3")
+        mc3_1, mc3_2, mc3_3, mc3_4 = st.columns(4)
+        with mc3_1: ug_3 = st.number_input("Unidades/Galón (M3)", min_value=0.0, value=0.0, key="ug_3")
+        with mc3_2: v_3 = st.number_input("Volumen (M3)", min_value=0.0, value=0.0, key="v_3")
+        with mc3_3: b_3 = st.number_input("Brix° (5-5.9) (M3)", min_value=0.0, value=0.0, key="b_3", format="%.2f")
+        with mc3_4: ph_3 = st.number_input("pH (M3)", min_value=0.0, value=0.0, key="ph_3", format="%.2f")
 
         submitted = st.form_submit_button("Guardar y Enviar a Revisión", type="primary")
         
         if submitted:
-            if not responsable.strip() or not proveedor.strip():
-                st.error("Por favor complete el nombre del responsable y del proveedor.")
+            if proveedor_opcion == "Otro" and not proveedor_final.strip():
+                st.error("Por favor, ingrese el nombre del nuevo proveedor.")
             else:
                 nuevo_registro = {
                     "ID_Registro": datetime.now().strftime("%Y%m%d%H%M%S"),
@@ -202,10 +225,12 @@ elif st.session_state["nav_state"] == "form":
                     "Hora": str(hora),
                     "Desc_Materia": desc_materia, 
                     "Observaciones": observaciones,
-                    "Proveedor": proveedor, 
+                    "Proveedor": proveedor_final, 
                     "Total_Fruta": total_fruta, 
                     "Cant_Unidades": cant_unidades,
-                    **muestras,
+                    "unidades_galon_1": ug_1, "volumen_1": v_1, "brix_1": b_1, "ph_1": ph_1,
+                    "unidades_galon_2": ug_2, "volumen_2": v_2, "brix_2": b_2, "ph_2": ph_2,
+                    "unidades_galon_3": ug_3, "volumen_3": v_3, "brix_3": b_3, "ph_3": ph_3,
                     "Firma_Jefe": "Sin firma"
                 }
                 df = cargar_datos()
@@ -225,7 +250,7 @@ elif st.session_state["nav_state"] == "admin_login":
     password_input = st.text_input("Contraseña de Administrador", type="password")
     
     if st.button("Verificar Acceso", type="primary"):
-        if password_input == "glad726lif":  # Contraseña heredada de tu estándar
+        if password_input == "glad726lif":  
             st.session_state["admin_logueado"] = True
             st.session_state["nav_state"] = "admin_dashboard"
             st.rerun()
@@ -252,7 +277,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
     if df.empty:
         st.info("No hay registros guardados en el sistema actualmente.")
     else:
-        # Pestañas requeridas por ti
         tab_pendientes, tab_aprobados, tab_todos = st.tabs([
             "📌 Registros Pendientes por Validar", 
             "✅ Registros Aprobados", 
@@ -292,7 +316,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                                 ruta_firma = os.path.join(FIRMAS_DIR, nombre_firma)
                                 img.save(ruta_firma)
                                 
-                                # Actualizar DataFrame
                                 df.at[idx, "Estado"] = "Aprobado"
                                 df.at[idx, "Firma_Jefe"] = nombre_firma
                                 guardar_datos(df)
@@ -314,7 +337,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         with tab_todos:
             st.subheader("Historial Completo de Registros")
             
-            # Filtros por fecha y proveedor
             col_f1, col_f2 = st.columns(2)
             with col_f1:
                 filtro_fecha = st.date_input("Filtrar por Fecha (Opcional)", value=None)
@@ -337,7 +359,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                     **ID:** {row['ID_Registro']} | **Fecha:** {row['Fecha']} | **Proveedor:** {row['Proveedor']} | **Estado:** {estado_color}
                     """, unsafe_allow_html=True)
                     
-                    # Si ya está aprobado, permitir descargar el PDF relleno con la firma oficial
                     if row["Estado"] == "Aprobado":
                         pdf_bytes = generar_pdf_relleno(row.to_dict())
                         if pdf_bytes:
