@@ -193,7 +193,8 @@ def generar_pdf_nuevo(registro):
         ('SPAN', (1,18), (-1,18)), ('SPAN', (1,19), (-1,19)), ('SPAN', (1,20), (-1,20)), ('SPAN', (1,21), (-1,21)),
     ])
     
-    row_heights = [45] + [20]*5 + [15] + [15]*4 + [15] + [15]*4 + [15] + [15]*4
+    # === AQUÍ ESTÁ LA CORRECCIÓN DE LAS ALTURAS (22 Filas en total) ===
+    row_heights = [45] + [20]*5 + [15]*16
     t = Table(data, colWidths=col_widths, rowHeights=row_heights)
     t.setStyle(style)
     
