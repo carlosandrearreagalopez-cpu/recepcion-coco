@@ -46,11 +46,11 @@ input, select {
     border: 1px solid #cbd5e1 !important;
     border-radius: 4px;
 }
-.card-registro {
+.card-seccion {
     padding: 15px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 15px;
     background-color: #f8fafc;
     border-left: 5px solid #1e3a8a;
 }
@@ -79,7 +79,7 @@ def cargar_datos():
 def guardar_datos(df):
     df.to_excel(EXCEL_FILE, index=False)
 
-# Función optimizada para rellenar el PDF en las coordenadas exactas de las celdas
+# Función optimizada para rellenar el PDF con los textos bien posicionados
 def generar_pdf_relleno(registro):
     if not os.path.exists(PDF_PLANTILLA):
         return None
@@ -87,34 +87,34 @@ def generar_pdf_relleno(registro):
     doc = fitz.open(PDF_PLANTILLA)
     pagina = doc[0]
     
-    # Coordenadas exactas alineadas con el formato oficial de la imagen
+    # Coordenadas ajustadas para evitar sobreposición y asegurar legibilidad
     coordenadas = {
-        "Responsable": (200, 150),
+        "Responsable": (210, 150),
         "Fecha": (460, 150),
         "Hora": (650, 150),
-        "Desc_Materia": (200, 178),
+        "Desc_Materia": (210, 178),
         "Observaciones": (500, 185),
-        "Proveedor": (200, 205),
-        "Total_Fruta": (200, 235),
-        "Cant_Unidades": (200, 260),
+        "Proveedor": (210, 205),
+        "Total_Fruta": (210, 235),
+        "Cant_Unidades": (210, 260),
         
         # Muestra 1
-        "unidades_galon_1": (200, 325),
-        "volumen_1": (200, 350),
-        "brix_1": (200, 375),
-        "ph_1": (200, 400),
+        "unidades_galon_1": (210, 325),
+        "volumen_1": (210, 350),
+        "brix_1": (210, 375),
+        "ph_1": (210, 400),
         
         # Muestra 2
-        "unidades_galon_2": (200, 440),
-        "volumen_2": (200, 465),
-        "brix_2": (200, 490),
-        "ph_2": (200, 515),
+        "unidades_galon_2": (210, 440),
+        "volumen_2": (210, 465),
+        "brix_2": (210, 490),
+        "ph_2": (210, 515),
         
         # Muestra 3
-        "unidades_galon_3": (200, 555),
-        "volumen_3": (200, 580),
-        "brix_3": (200, 605),
-        "ph_3": (200, 630),
+        "unidades_galon_3": (210, 555),
+        "volumen_3": (210, 580),
+        "brix_3": (210, 605),
+        "ph_3": (210, 630),
     }
 
     for campo, coord in coordenadas.items():
@@ -214,7 +214,6 @@ elif st.session_state["nav_state"] == "form":
                 st.session_state["nav_state"] = "home"
                 st.rerun()
     else:
-        # Proveedor fuera del form para reacción inmediata en celulares
         st.markdown("### Selección de Proveedor")
         proveedor_opcion = st.selectbox("Nombre del proveedor", ["GRANOS BASICOS LA PATRONA SOCIEDAD ANONIMA", "Otro"])
         proveedor_final = ""
@@ -316,7 +315,7 @@ elif st.session_state["nav_state"] == "admin_login":
                 st.error("Contraseña incorrecta.")
 
 # ==========================================
-# 5. DASHBOARD DEL ADMINISTRADOR (ESTILO INSPECCIÓN)
+# 5. DASHBOARD DEL ADMINISTRADOR (ESTILO INSPECCIÓN CORPORATIVA)
 # ==========================================
 elif st.session_state["nav_state"] == "admin_dashboard":
     if not st.session_state.get("admin_logueado", False):
@@ -337,59 +336,71 @@ elif st.session_state["nav_state"] == "admin_dashboard":
     if df.empty:
         st.info("No hay registros guardados en el sistema actualmente.")
     else:
-        # Pestañas limpias estilo sistema corporativo
         tab_pendientes, tab_aprobados, tab_todos = st.tabs([
-            "⏳ Pendientes por Validar", 
-            "✅ Aprobados", 
+            "⏳ Registros Pendientes por Validar", 
+            "✅ Registros Aprobados", 
             "📊 Historial Completo de Registros"
         ])
         
+        # PESTAÑA 1: PENDIENTES (ESTILO TARJETAS LIMPIAS)
         with tab_pendientes:
             df_pendientes = df[df["Estado"] == "Pendiente"]
             if df_pendientes.empty:
                 st.success("¡Excelente! No hay registros pendientes de firma.")
             else:
                 for idx, row in df_pendientes.iterrows():
-                    with st.container():
-                        st.markdown(f"""
-                        <div class="card-registro">
-                        <b>#{row['ID_Registro']} — Proveedor: {row['Proveedor']}</b><br>
-                        Fecha: {row['Fecha']} | Responsable: {row['Responsable']} | Total Fruta: {row['Total_Fruta']}
-                        </div>
-                        """, unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class="card-seccion">
+                    <b>Registrado el {row['Fecha']} por {row['Responsable']} · Estado: Pendiente de revisión</b><br><br>
+                    <b>📦 Datos Generales:</b><br>
+                    Proveedor: {row['Proveedor']} | Materia Prima: {row['Desc_Materia']} | Total Fruta: {row['Total_Fruta']} L<br>
+                    Hora: {row['Hora']} | Observaciones: {row['Observaciones']}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    with st.expander(f"🔍 Revisar y completar aprobación (ID: #{row['ID_Registro']})"):
+                        st.markdown("#### Parámetros Registrados:")
+                        c_m1, c_m2, c_m3 = st.columns(3)
+                        with c_m1:
+                            st.markdown(f"**Muestra 1**<br>Galón: {row['unidades_galon_1']}<br>Vol: {row['volumen_1']}<br>Brix: {row['brix_1']}<br>pH: {row['ph_1']}", unsafe_allow_html=True)
+                        with c_m2:
+                            st.markdown(f"**Muestra 2**<br>Galón: {row['unidades_galon_2']}<br>Vol: {row['volumen_2']}<br>Brix: {row['brix_2']}<br>pH: {row['ph_2']}", unsafe_allow_html=True)
+                        with c_m3:
+                            st.markdown(f"**Muestra 3**<br>Galón: {row['unidades_galon_3']}<br>Vol: {row['volumen_3']}<br>Brix: {row['brix_3']}<br>pH: {row['ph_3']}", unsafe_allow_html=True)
                         
-                        if st.button(f"Revisar y Firmar #{row['ID_Registro']}", key=f"btn_ver_{idx}"):
-                            st.write(row.to_dict())
-                            st.markdown("#### Dibuje su firma de aprobación:")
-                            canvas_result = st_canvas(
-                                fill_color="rgba(255, 255, 255, 0.3)", 
-                                stroke_width=2,
-                                stroke_color="#1e3a8a", 
-                                background_color="#FFFFFF",
-                                height=120, 
-                                width=400, 
-                                drawing_mode="freedraw",
-                                key=f"canvas_firma_{row['ID_Registro']}"
-                            )
-                            
-                            if st.button(f"Validar y Firmar Definitivamente #{row['ID_Registro']}", key=f"btn_firmar_{row['ID_Registro']}", type="primary"):
-                                if canvas_result.image_data is not None:
-                                    import numpy as np
-                                    from PIL import Image
-                                    img_data = canvas_result.image_data
-                                    img = Image.fromarray(img_data.astype('uint8'), mode="RGBA")
-                                    nombre_firma = f"firma_{row['ID_Registro']}.png"
-                                    ruta_firma = os.path.join(FIRMAS_DIR, nombre_firma)
-                                    img.save(ruta_firma)
-                                    
-                                    df.at[idx, "Estado"] = "Aprobado"
-                                    df.at[idx, "Firma_Jefe"] = nombre_firma
-                                    guardar_datos(df)
-                                    st.success("¡Registro validado y firmado correctamente!")
-                                    st.rerun()
-                                else:
-                                    st.warning("Por favor dibuje la firma antes de validar.")
+                        st.markdown("---")
+                        st.markdown("#### ✍️ Firma de V°B° Calidad")
+                        
+                        canvas_result = st_canvas(
+                            fill_color="rgba(255, 255, 255, 0.3)", 
+                            stroke_width=2,
+                            stroke_color="#1e3a8a", 
+                            background_color="#FFFFFF",
+                            height=120, 
+                            width=400, 
+                            drawing_mode="freedraw",
+                            key=f"canvas_firma_{row['ID_Registro']}"
+                        )
+                        
+                        if st.button(f"Guardar aprobación y firmar #{row['ID_Registro']}", key=f"btn_firmar_{row['ID_Registro']}", type="primary"):
+                            if canvas_result.image_data is not None:
+                                import numpy as np
+                                from PIL import Image
+                                img_data = canvas_result.image_data
+                                img = Image.fromarray(img_data.astype('uint8'), mode="RGBA")
+                                nombre_firma = f"firma_{row['ID_Registro']}.png"
+                                ruta_firma = os.path.join(FIRMAS_DIR, nombre_firma)
+                                img.save(ruta_firma)
+                                
+                                df.at[idx, "Estado"] = "Aprobado"
+                                df.at[idx, "Firma_Jefe"] = nombre_firma
+                                guardar_datos(df)
+                                st.success("¡Registro validado y firmado correctamente!")
+                                st.rerun()
+                            else:
+                                st.warning("Por favor dibuje la firma antes de validar.")
 
+        # PESTAÑA 2: APROBADOS
         with tab_aprobados:
             df_aprobados = df[df["Estado"] == "Aprobado"]
             if df_aprobados.empty:
@@ -397,12 +408,13 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             else:
                 for idx, row in df_aprobados.iterrows():
                     st.markdown(f"""
-                    <div class="card-registro">
+                    <div class="card-seccion">
                     <b>✅ ID: {row['ID_Registro']} | Proveedor: {row['Proveedor']}</b><br>
                     Fecha: {row['Fecha']} | Responsable: {row['Responsable']} | Estado: Aprobado
                     </div>
                     """, unsafe_allow_html=True)
 
+        # PESTAÑA 3: HISTORIAL COMPLETO
         with tab_todos:
             col_f1, col_f2 = st.columns(2)
             with col_f1:
@@ -423,7 +435,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                 estado_badge = "🟢 Aprobado" if row["Estado"] == "Aprobado" else "🟠 Pendiente"
                 with st.container():
                     st.markdown(f"""
-                    <div class="card-registro">
+                    <div class="card-seccion">
                     <b>ID: {row['ID_Registro']}</b> | <b>Fecha:</b> {row['Fecha']} | <b>Proveedor:</b> {row['Proveedor']} | <b>Estado:</b> {estado_badge}
                     </div>
                     """, unsafe_allow_html=True)
