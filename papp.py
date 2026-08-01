@@ -66,7 +66,7 @@ button[kind="primary"]:hover {
     background-color: #f0fdf4 !important;
 }
 
-/* Tarjetas (Cards) de Registros imitando las imágenes */
+/* Tarjetas (Cards) de Registros */
 .record-card {
     background-color: #ffffff;
     border: 1px solid #e2e8f0;
@@ -123,11 +123,16 @@ def cargar_datos():
 def guardar_datos(df):
     df.to_excel(EXCEL_FILE, index=False)
 
-def eliminar_registro(id_registro):
+def eliminar_registro(id_registro, idx_excel):
     df = cargar_datos()
-    df = df[df["ID_Registro"] != id_registro]
+    # Eliminamos por índice para asegurar que si hay IDs duplicados solo borremos el correcto
+    if idx_excel in df.index:
+        df = df.drop(index=idx_excel)
+    else:
+        # Fallback por si acaso
+        df = df[df["ID_Registro"] != id_registro]
     guardar_datos(df)
-    st.success(f"Registro #{id_registro} eliminado.")
+    st.success(f"Registro eliminado correctamente.")
 
 def generar_excel_bytes(df):
     output = io.BytesIO()
@@ -145,44 +150,16 @@ def generar_pdf_nuevo(registro):
     
     margin_x, margin_y = 40, 40
     usable_width = width - (2 * margin_x)
-    
-    # Ajustamos anchos para darle más espacio al proveedor (columna 1)
     col_widths = [140, 240, 60, 100, 50, usable_width - (140+240+60+100+50)]
-    
     styles = getSampleStyleSheet()
     
-    # Estilos de párrafos para permitir ajuste de texto automático y evitar desbordamientos
-    style_normal = ParagraphStyle(
-        'CellNormal',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9,
-        leading=11,
-        textColor=colors.black
-    )
-    
-    style_bold = ParagraphStyle(
-        'CellBold',
-        parent=style_normal,
-        fontName='Helvetica-Bold'
-    )
-    
-    style_center_bold = ParagraphStyle(
-        'CellCenterBold',
-        parent=style_bold,
-        alignment=1 # Centrado
-    )
-
-    style_meta = ParagraphStyle(
-        'CellMeta',
-        parent=style_normal,
-        fontSize=8,
-        leading=10
-    )
+    style_normal = ParagraphStyle('CellNormal', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=11, textColor=colors.black)
+    style_bold = ParagraphStyle('CellBold', parent=style_normal, fontName='Helvetica-Bold')
+    style_center_bold = ParagraphStyle('CellCenterBold', parent=style_bold, alignment=1)
+    style_meta = ParagraphStyle('CellMeta', parent=style_normal, fontSize=8, leading=10)
 
     logo_img = RLImage("logo.png", width=80, height=30) if os.path.exists("logo.png") else ""
         
-    # Construcción de celdas usando Paragraphs para textos largos
     data = [
         [logo_img, Paragraph("Control de Recepción de Coco", style_center_bold), "", "", "", Paragraph(f"Código: R ICC/15-2<br/>Versión: 02<br/>ID: #{registro.get('ID_Registro', '')}", style_meta)],
         [Paragraph("Nombre del responsable:", style_bold), Paragraph(str(registro.get('Responsable', '')), style_normal), Paragraph("Fecha:", style_bold), Paragraph(str(registro.get('Fecha', '')), style_normal), Paragraph("Hora:", style_bold), Paragraph(str(registro.get('Hora', '')), style_normal)],
@@ -209,16 +186,11 @@ def generar_pdf_nuevo(registro):
     ]
     
     style = TableStyle([
-        ('GRID', (0,0), (-1,-1), 1, colors.black),
-        ('BOX', (0,0), (-1,-1), 2, colors.black),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('SPAN', (1,0), (4,0)), ('VALIGN', (1,0), (1,0), 'MIDDLE'),
-        ('VALIGN', (5,0), (5,0), 'TOP'),
-        ('SPAN', (2,2), (5,2)), 
-        ('SPAN', (2,3), (5,5)), ('VALIGN', (2,3), (5,5), 'TOP'),
+        ('GRID', (0,0), (-1,-1), 1, colors.black), ('BOX', (0,0), (-1,-1), 2, colors.black), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('SPAN', (1,0), (4,0)), ('VALIGN', (1,0), (1,0), 'MIDDLE'), ('VALIGN', (5,0), (5,0), 'TOP'),
+        ('SPAN', (2,2), (5,2)), ('SPAN', (2,3), (5,5)), ('VALIGN', (2,3), (5,5), 'TOP'),
         ('SPAN', (1,3), (1,3)), ('SPAN', (1,4), (1,4)), ('SPAN', (1,5), (1,5)),
-        ('SPAN', (0,6), (-1,6)), 
-        ('SPAN', (0,7), (-1,7)), 
+        ('SPAN', (0,6), (-1,6)), ('SPAN', (0,7), (-1,7)), 
         ('SPAN', (1,8), (-1,8)), ('SPAN', (1,9), (-1,9)), ('SPAN', (1,10), (-1,10)), ('SPAN', (1,11), (-1,11)),
         ('SPAN', (0,12), (-1,12)), 
         ('SPAN', (1,13), (-1,13)), ('SPAN', (1,14), (-1,14)), ('SPAN', (1,15), (-1,15)), ('SPAN', (1,16), (-1,16)),
@@ -226,7 +198,6 @@ def generar_pdf_nuevo(registro):
         ('SPAN', (1,18), (-1,18)), ('SPAN', (1,19), (-1,19)), ('SPAN', (1,20), (-1,20)), ('SPAN', (1,21), (-1,21)),
     ])
     
-    # Alturas dinámicas para acomodar texto multilínea si es necesario
     row_heights = [45] + [22]*5 + [16]*16
     t = Table(data, colWidths=col_widths, rowHeights=row_heights)
     t.setStyle(style)
@@ -334,10 +305,10 @@ elif st.session_state["nav_state"] == "form":
                 proveedor_final = st.text_input("Si eligió 'Otro', escriba el nombre:") if proveedor_opcion == "Otro" else proveedor_opcion
                 desc_materia = st.text_input("Materia prima", value="Coco")
             with c2:
-                fecha = st.date_input("Fecha")
-                hora = st.time_input("Hora")
-                total_fruta = st.number_input("Total Fruta Ingresada", min_value=0.0)
-                cant_unidades = st.number_input("Unidades (Muestra)", min_value=0.0)
+                fecha = st.date_input("Fecha", value=datetime.today())
+                hora = st.time_input("Hora", value=datetime.now().time(), step=60)
+                total_fruta = st.number_input("Total Fruta Ingresada", min_value=0.0, value=0.0)
+                cant_unidades = st.number_input("Unidades (Muestra)", min_value=0.0, value=0.0)
             
             observaciones = st.text_area("Observaciones", value="Ninguna")
             
@@ -346,10 +317,10 @@ elif st.session_state["nav_state"] == "form":
             for i in range(1, 4):
                 st.subheader(f"Muestra {i}")
                 mc1, mc2, mc3, mc4 = st.columns(4)
-                with mc1: muestras_datos[f"ug_{i}"] = st.number_input(f"Unidades/Galón (M{i})", min_value=0.0)
-                with mc2: muestras_datos[f"v_{i}"] = st.number_input(f"Volumen (M{i})", min_value=0.0)
-                with mc3: muestras_datos[f"b_{i}"] = st.number_input(f"Brix° (M{i})", min_value=0.0, format="%.2f")
-                with mc4: muestras_datos[f"ph_{i}"] = st.number_input(f"pH (M{i})", min_value=0.0, format="%.2f")
+                with mc1: muestras_datos[f"ug_{i}"] = st.number_input(f"Unidades/Galón (M{i})", min_value=0.0, value=0.0)
+                with mc2: muestras_datos[f"v_{i}"] = st.number_input(f"Volumen (M{i})", min_value=0.0, value=0.0)
+                with mc3: muestras_datos[f"b_{i}"] = st.number_input(f"Brix° (M{i})", min_value=0.0, value=0.0, format="%.2f")
+                with mc4: muestras_datos[f"ph_{i}"] = st.number_input(f"pH (M{i})", min_value=0.0, value=0.0, format="%.2f")
 
             submitted = st.form_submit_button("Guardar y Enviar a Revisión", type="primary")
             
@@ -373,7 +344,7 @@ elif st.session_state["nav_state"] == "form":
                 st.rerun()
 
 # ==========================================
-# 4. DASHBOARD DEL ADMINISTRADOR (Estilo LIF)
+# 4. DASHBOARD DEL ADMINISTRADOR
 # ==========================================
 elif st.session_state["nav_state"] == "admin_dashboard":
     if not st.session_state.get("admin_logueado", False):
@@ -392,13 +363,11 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             
     df = cargar_datos()
     
-    # Diseño de pestañas tipo interfaz mostrada
-    tab_pendientes, tab_aprobados, tab_todos = st.tabs([
-        "⏳ Pendientes", "✅ Aprobados", "📊 Todos"
-    ])
+    tab_pendientes, tab_aprobados, tab_todos = st.tabs(["⏳ Pendientes", "✅ Aprobados", "📊 Todos"])
     
     # FUNCIONES DE RENDERIZADO DE TARJETAS
-    def render_tarjeta(row, index_key):
+    # ¡NUEVO!: Se agregó idx (índice de la fila) a todos los identificadores para evitar errores por duplicados en la base de datos
+    def render_tarjeta(row, index_key, idx):
         estado_icono = "⏳" if row['Estado'] == "Pendiente" else "✅"
         st.markdown(f"""
         <div class="record-card">
@@ -410,16 +379,17 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         c_btn1, c_btn2, c_btn3 = st.columns([2, 2, 8])
         
         with c_btn1:
-            if st.button("🗑️ Eliminar", key=f"del_{index_key}_{row['ID_Registro']}", help="Eliminar registro"):
-                eliminar_registro(row['ID_Registro'])
+            if st.button("🗑️ Eliminar", key=f"del_{index_key}_{idx}_{row['ID_Registro']}", help="Eliminar registro"):
+                eliminar_registro(row['ID_Registro'], idx)
                 st.rerun()
                 
         with c_btn2:
             if row['Estado'] == 'Aprobado':
                 pdf_bytes = generar_pdf_nuevo(row.to_dict())
-                st.download_button("📥 PDF", data=pdf_bytes, file_name=f"Registro_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{row['ID_Registro']}")
+                st.download_button("📥 PDF", data=pdf_bytes, file_name=f"Registro_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{idx}_{row['ID_Registro']}")
 
-        with st.expander(f"Ver detalles del registro #{row['ID_Registro']}"):
+        espaciador = " " * (1 if index_key == "pen" else 2 if index_key == "apr" else 3)
+        with st.expander(f"Ver detalles del registro #{row['ID_Registro']}{espaciador}"):
             st.write(f"**Observaciones:** {row['Observaciones']} | **Fruta:** {row['Total_Fruta']} | **Unidades:** {row['Cant_Unidades']}")
             st.write("---")
             c_m1, c_m2, c_m3 = st.columns(3)
@@ -429,20 +399,23 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             
             if row['Estado'] == "Pendiente":
                 st.markdown("#### ✍️ Aprobar y Firmar")
+                
+                # Se incorpora idx al canvas para garantizar una ID 100% única en todo el sistema
                 canvas_result = st_canvas(
                     fill_color="rgba(255, 255, 255, 0)", stroke_width=2, stroke_color="#0f766e",
                     background_color="#f8fafc", height=100, width=350, drawing_mode="freedraw",
-                    key=f"canvas_{row['ID_Registro']}"
+                    key=f"canvas_firma_{index_key}_{idx}_{row['ID_Registro']}"
                 )
-                if st.button("Aprobar Registro", key=f"btn_aprobar_{row['ID_Registro']}", type="primary"):
+                
+                if st.button("Aprobar Registro", key=f"btn_aprobar_{index_key}_{idx}_{row['ID_Registro']}", type="primary"):
                     if canvas_result.image_data is not None:
                         from PIL import Image
                         img = Image.fromarray(canvas_result.image_data.astype('uint8'), mode="RGBA")
-                        nombre_firma = f"firma_{row['ID_Registro']}.png"
+                        nombre_firma = f"firma_{idx}_{row['ID_Registro']}.png"
                         img.save(os.path.join(FIRMAS_DIR, nombre_firma))
                         
-                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Aprobado"
-                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Firma_Jefe'] = nombre_firma
+                        df.at[idx, 'Estado'] = "Aprobado"
+                        df.at[idx, 'Firma_Jefe'] = nombre_firma
                         guardar_datos(df)
                         st.success("Registro aprobado correctamente.")
                         st.rerun()
@@ -452,20 +425,18 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         df_pen = df[df["Estado"] == "Pendiente"]
         st.write(f"### Registros Pendientes ({len(df_pen)})")
         for idx, row in df_pen.iterrows():
-            render_tarjeta(row, "pen")
+            render_tarjeta(row, "pen", idx)
 
     # --- PESTAÑA: APROBADOS ---
     with tab_aprobados:
         df_apr = df[df["Estado"] == "Aprobado"]
         st.write(f"### Registros Aprobados ({len(df_apr)})")
         for idx, row in df_apr.iterrows():
-            render_tarjeta(row, "apr")
+            render_tarjeta(row, "apr", idx)
 
     # --- PESTAÑA: TODOS Y DESCARGA EXCEL ---
     with tab_todos:
         st.write("### Historial Completo")
-        
-        # Panel de Métricas
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
         col_m1.metric("⏳ Pendientes", len(df[df["Estado"]=="Pendiente"]))
         col_m2.metric("✅ Aprobados", len(df[df["Estado"]=="Aprobado"]))
@@ -473,21 +444,14 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         col_m4.metric("📊 Total", len(df))
         
         st.markdown("---")
-        
-        # Botón Descargar Excel Integrado
         if not df.empty:
             excel_bytes = generar_excel_bytes(df)
             st.download_button(
-                label=f"📥 Descargar Excel completo ({len(df)} filas)",
-                data=excel_bytes,
-                file_name="Todos_los_Registros_LIF.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary"
+                label=f"📥 Descargar Excel completo ({len(df)} filas)", data=excel_bytes,
+                file_name="Todos_los_Registros_LIF.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary"
             )
             
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Filtros opcionales estilo LIF
         cf1, cf2 = st.columns(2)
         with cf1:
             prov_filtro = st.selectbox("Filtrar por Proveedor:", ["Todos"] + list(df["Proveedor"].unique()))
@@ -495,4 +459,4 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         df_mostrar = df if prov_filtro == "Todos" else df[df["Proveedor"] == prov_filtro]
         
         for idx, row in df_mostrar.iterrows():
-            render_tarjeta(row, "tod")
+            render_tarjeta(row, "tod", idx)
