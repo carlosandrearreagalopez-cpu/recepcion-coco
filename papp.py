@@ -11,7 +11,8 @@ import openpyxl
 # Importaciones para PDF (Formato Horizontal Matricial)
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas as pdf_canvas
-from reportlab.platypus import Table, TableStyle, Image as RLImage
+from reportlab.platypus import Table, TableStyle, Image as RLImage, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
 # ==========================================
@@ -144,57 +145,89 @@ def generar_pdf_nuevo(registro):
     
     margin_x, margin_y = 40, 40
     usable_width = width - (2 * margin_x)
-    col_widths = [160, 220, 60, 100, 50, usable_width - (160+220+60+100+50)]
     
-    logo_img = RLImage("logo.png", width=90, height=35) if os.path.exists("logo.png") else ""
+    # Ajustamos anchos para darle más espacio al proveedor (columna 1)
+    col_widths = [140, 240, 60, 100, 50, usable_width - (140+240+60+100+50)]
+    
+    styles = getSampleStyleSheet()
+    
+    # Estilos de párrafos para permitir ajuste de texto automático y evitar desbordamientos
+    style_normal = ParagraphStyle(
+        'CellNormal',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=11,
+        textColor=colors.black
+    )
+    
+    style_bold = ParagraphStyle(
+        'CellBold',
+        parent=style_normal,
+        fontName='Helvetica-Bold'
+    )
+    
+    style_center_bold = ParagraphStyle(
+        'CellCenterBold',
+        parent=style_bold,
+        alignment=1 # Centrado
+    )
+
+    style_meta = ParagraphStyle(
+        'CellMeta',
+        parent=style_normal,
+        fontSize=8,
+        leading=10
+    )
+
+    logo_img = RLImage("logo.png", width=80, height=30) if os.path.exists("logo.png") else ""
         
+    # Construcción de celdas usando Paragraphs para textos largos
     data = [
-        [logo_img, "Control de Recepción de Coco", "", "", "", f"Código: R ICC/15-2\nVersión: 02\nID: #{registro.get('ID_Registro', '')}"],
-        ["Nombre del responsable:", registro.get('Responsable', ''), "Fecha:", str(registro.get('Fecha', '')), "Hora:", str(registro.get('Hora', ''))],
-        ["Descripción de materia prima:", registro.get('Desc_Materia', ''), "Observaciones", "", "", ""],
-        ["Nombre del proveedor", registro.get('Proveedor', ''), registro.get('Observaciones', 'Ninguna'), "", "", ""],
-        ["Total de Fruta Ingresada Planta", str(registro.get('Total_Fruta', '')), "", "", "", ""],
-        ["Cantidad Unidades (Muestra)", str(registro.get('Cant_Unidades', '')), "", "", "", ""],
-        ["PARÁMETROS FISICOQUÍMICOS", "", "", "", "", ""],
-        ["Muestra 1", "", "", "", "", ""],
-        ["Unidades/Galón", str(registro.get('unidades_galon_1', '')), "", "", "", ""],
-        ["Volumen (Muestra)", str(registro.get('volumen_1', '')), "", "", "", ""],
-        ["Brix° (5 - 5.9)", str(registro.get('brix_1', '')), "", "", "", ""],
-        ["pH", str(registro.get('ph_1', '')), "", "", "", ""],
-        ["Muestra 2", "", "", "", "", ""],
-        ["Unidades/Galón", str(registro.get('unidades_galon_2', '')), "", "", "", ""],
-        ["Volumen (Muestra)", str(registro.get('volumen_2', '')), "", "", "", ""],
-        ["Brix° (5 - 5.9)", str(registro.get('brix_2', '')), "", "", "", ""],
-        ["pH", str(registro.get('ph_2', '')), "", "", "", ""],
-        ["Muestra 3", "", "", "", "", ""],
-        ["Unidades/Galón", str(registro.get('unidades_galon_3', '')), "", "", "", ""],
-        ["Volumen (Muestra)", str(registro.get('volumen_3', '')), "", "", "", ""],
-        ["Brix° (5 - 5.9)", str(registro.get('brix_3', '')), "", "", "", ""],
-        ["pH", str(registro.get('ph_3', '')), "", "", "", ""],
+        [logo_img, Paragraph("Control de Recepción de Coco", style_center_bold), "", "", "", Paragraph(f"Código: R ICC/15-2<br/>Versión: 02<br/>ID: #{registro.get('ID_Registro', '')}", style_meta)],
+        [Paragraph("Nombre del responsable:", style_bold), Paragraph(str(registro.get('Responsable', '')), style_normal), Paragraph("Fecha:", style_bold), Paragraph(str(registro.get('Fecha', '')), style_normal), Paragraph("Hora:", style_bold), Paragraph(str(registro.get('Hora', '')), style_normal)],
+        [Paragraph("Descripción de materia prima:", style_bold), Paragraph(str(registro.get('Desc_Materia', '')), style_normal), Paragraph("Observaciones", style_center_bold), "", "", ""],
+        [Paragraph("Nombre del proveedor", style_bold), Paragraph(str(registro.get('Proveedor', '')), style_normal), Paragraph(str(registro.get('Observaciones', 'Ninguna')), style_normal), "", "", ""],
+        [Paragraph("Total de Fruta Ingresada Planta", style_bold), Paragraph(str(registro.get('Total_Fruta', '')), style_normal), "", "", "", ""],
+        [Paragraph("Cantidad Unidades (Muestra)", style_bold), Paragraph(str(registro.get('Cant_Unidades', '')), style_normal), "", "", "", ""],
+        [Paragraph("PARÁMETROS FISICOQUÍMICOS", style_center_bold), "", "", "", "", ""],
+        [Paragraph("Muestra 1", style_center_bold), "", "", "", "", ""],
+        [Paragraph("Unidades/Galón", style_normal), Paragraph(str(registro.get('unidades_galon_1', '')), style_normal), "", "", "", ""],
+        [Paragraph("Volumen (Muestra)", style_normal), Paragraph(str(registro.get('volumen_1', '')), style_normal), "", "", "", ""],
+        [Paragraph("Brix° (5 - 5.9)", style_normal), Paragraph(str(registro.get('brix_1', '')), style_normal), "", "", "", ""],
+        [Paragraph("pH", style_normal), Paragraph(str(registro.get('ph_1', '')), style_normal), "", "", "", ""],
+        [Paragraph("Muestra 2", style_center_bold), "", "", "", "", ""],
+        [Paragraph("Unidades/Galón", style_normal), Paragraph(str(registro.get('unidades_galon_2', '')), style_normal), "", "", "", ""],
+        [Paragraph("Volumen (Muestra)", style_normal), Paragraph(str(registro.get('volumen_2', '')), style_normal), "", "", "", ""],
+        [Paragraph("Brix° (5 - 5.9)", style_normal), Paragraph(str(registro.get('brix_2', '')), style_normal), "", "", "", ""],
+        [Paragraph("pH", style_normal), Paragraph(str(registro.get('ph_2', '')), style_normal), "", "", "", ""],
+        [Paragraph("Muestra 3", style_center_bold), "", "", "", "", ""],
+        [Paragraph("Unidades/Galón", style_normal), Paragraph(str(registro.get('unidades_galon_3', '')), style_normal), "", "", "", ""],
+        [Paragraph("Volumen (Muestra)", style_normal), Paragraph(str(registro.get('volumen_3', '')), style_normal), "", "", "", ""],
+        [Paragraph("Brix° (5 - 5.9)", style_normal), Paragraph(str(registro.get('brix_3', '')), style_normal), "", "", "", ""],
+        [Paragraph("pH", style_normal), Paragraph(str(registro.get('ph_3', '')), style_normal), "", "", "", ""],
     ]
     
     style = TableStyle([
         ('GRID', (0,0), (-1,-1), 1, colors.black),
         ('BOX', (0,0), (-1,-1), 2, colors.black),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,0), (-1,-1), 9),
-        ('SPAN', (1,0), (4,0)), ('ALIGN', (1,0), (1,0), 'CENTER'), ('FONTNAME', (1,0), (1,0), 'Helvetica-Bold'), ('FONTSIZE', (1,0), (1,0), 14),
-        ('FONTSIZE', (5,0), (5,0), 8), ('VALIGN', (5,0), (5,0), 'TOP'),
-        ('SPAN', (2,2), (5,2)), ('ALIGN', (2,2), (5,2), 'CENTER'), ('FONTNAME', (2,2), (5,2), 'Helvetica-Bold'),
+        ('SPAN', (1,0), (4,0)), ('VALIGN', (1,0), (1,0), 'MIDDLE'),
+        ('VALIGN', (5,0), (5,0), 'TOP'),
+        ('SPAN', (2,2), (5,2)), 
         ('SPAN', (2,3), (5,5)), ('VALIGN', (2,3), (5,5), 'TOP'),
         ('SPAN', (1,3), (1,3)), ('SPAN', (1,4), (1,4)), ('SPAN', (1,5), (1,5)),
-        ('SPAN', (0,6), (-1,6)), ('ALIGN', (0,6), (-1,6), 'CENTER'), ('FONTNAME', (0,6), (-1,6), 'Helvetica-Bold'),
-        ('SPAN', (0,7), (-1,7)), ('ALIGN', (0,7), (-1,7), 'CENTER'), ('FONTNAME', (0,7), (-1,7), 'Helvetica-Bold'),
+        ('SPAN', (0,6), (-1,6)), 
+        ('SPAN', (0,7), (-1,7)), 
         ('SPAN', (1,8), (-1,8)), ('SPAN', (1,9), (-1,9)), ('SPAN', (1,10), (-1,10)), ('SPAN', (1,11), (-1,11)),
-        ('SPAN', (0,12), (-1,12)), ('ALIGN', (0,12), (-1,12), 'CENTER'), ('FONTNAME', (0,12), (-1,12), 'Helvetica-Bold'),
+        ('SPAN', (0,12), (-1,12)), 
         ('SPAN', (1,13), (-1,13)), ('SPAN', (1,14), (-1,14)), ('SPAN', (1,15), (-1,15)), ('SPAN', (1,16), (-1,16)),
-        ('SPAN', (0,17), (-1,17)), ('ALIGN', (0,17), (-1,17), 'CENTER'), ('FONTNAME', (0,17), (-1,17), 'Helvetica-Bold'),
+        ('SPAN', (0,17), (-1,17)), 
         ('SPAN', (1,18), (-1,18)), ('SPAN', (1,19), (-1,19)), ('SPAN', (1,20), (-1,20)), ('SPAN', (1,21), (-1,21)),
     ])
     
-    # === AQUÍ ESTÁ LA CORRECCIÓN DE LAS ALTURAS (22 Filas en total) ===
-    row_heights = [45] + [20]*5 + [15]*16
+    # Alturas dinámicas para acomodar texto multilínea si es necesario
+    row_heights = [45] + [22]*5 + [16]*16
     t = Table(data, colWidths=col_widths, rowHeights=row_heights)
     t.setStyle(style)
     
@@ -436,7 +469,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
         col_m1.metric("⏳ Pendientes", len(df[df["Estado"]=="Pendiente"]))
         col_m2.metric("✅ Aprobados", len(df[df["Estado"]=="Aprobado"]))
-        col_m3.metric("❌ Rechazados", 0) # Placeholder si en el futuro hay rechazados
+        col_m3.metric("❌ Rechazados", 0)
         col_m4.metric("📊 Total", len(df))
         
         st.markdown("---")
