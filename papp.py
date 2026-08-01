@@ -13,7 +13,7 @@ from reportlab.lib import colors
 st.set_page_config(page_title="Control de Recepción de Coco - LIF Brands", layout="wide")
 
 # ==========================================
-# ESTILOS CSS CORREGIDOS
+# ESTILOS CSS CORREGIDOS (Garantiza lectura de texto)
 # ==========================================
 st.markdown("""
 <style>
@@ -95,57 +95,35 @@ def eliminar_registro(id_registro):
 # ==========================================
 def generar_pdf_tabla_coco(registro):
     buffer = io.BytesIO()
-    # Hoja en formato Horizontal (Landscape)
+    # Hoja en formato Horizontal (Landscape) para evitar sobreposición y dar espacio de tabla
     doc = SimpleDocTemplate(buffer, pagesize=landscape(letter),
                             rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     
     elementos = []
     styles = getSampleStyleSheet()
     
-    # Estilos personalizados para celdas
     style_titulo = ParagraphStyle(
-        'TituloFormato',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=13,
-        alignment=1, # Centrado
-        textColor=colors.black
+        'TituloFormato', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=13, alignment=1, textColor=colors.black
     )
-    
     style_header_info = ParagraphStyle(
-        'HeaderInfo',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=8,
-        textColor=colors.black
+        'HeaderInfo', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=8, textColor=colors.black
     )
-    
     style_celda = ParagraphStyle(
-        'CeldaTexto',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9,
-        textColor=colors.black
+        'CeldaTexto', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=9, textColor=colors.black
     )
-    
     style_celda_bold = ParagraphStyle(
-        'CeldaTextoBold',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=9,
-        textColor=colors.black
+        'CeldaTextoBold', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=9, textColor=colors.black
     )
-
     style_sub = ParagraphStyle(
-        'SubTabla',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=9,
-        alignment=1,
-        textColor=colors.black
+        'SubTabla', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=9, alignment=1, textColor=colors.black
     )
 
-    # 1. Cabecera Principal imitando la estructura de la imagen
+    # 1. Cabecera Principal
     logo_path = "logo.png" if os.path.exists("logo.png") else None
     logo_elem = RLImage(logo_path, width=70, height=35) if logo_path else Paragraph("LIF", style_celda_bold)
 
@@ -155,12 +133,9 @@ def generar_pdf_tabla_coco(registro):
         "<b>Aprobación:</b> 24/10/2017<br/>"
         "<b>Revisión:</b> 21/09/2020", style_header_info
     )
-    
     titulo_elem = Paragraph("<b>Control de Recepción de Coco</b>", style_titulo)
     
-    header_table_data = [
-        [logo_elem, titulo_elem, info_derecha]
-    ]
+    header_table_data = [[logo_elem, titulo_elem, info_derecha]]
     header_table = Table(header_table_data, colWidths=[100, 500, 192])
     header_table.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.black),
@@ -170,9 +145,9 @@ def generar_pdf_tabla_coco(registro):
     ]))
     
     elementos.append(header_table)
-    elementos.append(Spacer(1, 5))
+    elementos.append(Spacer(1, 4))
 
-    # 2. Datos Generales (Estructura de Tabla Cuadriculada)
+    # 2. Datos Generales (Estructura de Tabla Cuadriculada con espacios amplios)
     datos_generales = [
         [Paragraph("<b>Nombre del responsable:</b>", style_celda), Paragraph(str(registro.get('Responsable', '')), style_celda), 
          Paragraph("<b>Fecha:</b>", style_celda), Paragraph(str(registro.get('Fecha', '')), style_celda),
@@ -193,17 +168,16 @@ def generar_pdf_tabla_coco(registro):
         ('BOX', (0,0), (-1,-1), 1, colors.black),
         ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('SPAN', (1, 1), (1, 4)), # Proveedor / Total / Unidades span hacia abajo si es necesario o ajustado
-        ('SPAN', (3, 1), (5, 1)), # Observaciones abarca varias columnas
-        ('SPAN', (1, 2), (5, 2)), # Proveedor texto ancho
-        ('SPAN', (1, 3), (5, 3)), # Total fruta texto ancho
-        ('SPAN', (1, 4), (5, 4)), # Cantidad unidades texto ancho
+        ('SPAN', (3, 1), (5, 1)), 
+        ('SPAN', (1, 2), (5, 2)), 
+        ('SPAN', (1, 3), (5, 3)), 
+        ('SPAN', (1, 4), (5, 4)), 
     ]))
     
     elementos.append(t_gen)
-    elementos.append(Spacer(1, 5))
+    elementos.append(Spacer(1, 4))
 
-    # 3. Tabla de Parámetros Fisicoquímicos (Muestras 1, 2 y 3)
+    # 3. Parámetros Fisicoquímicos (Muestras en formato tabla limpia)
     tabla_fq_data = [
         [Paragraph("<b>PARÁMETROS FISICOQUÍMICOS</b>", style_sub), "", "", ""],
         [Paragraph("<b>Muestra 1</b>", style_sub), "", "", ""],
@@ -230,22 +204,10 @@ def generar_pdf_tabla_coco(registro):
         ('BOX', (0,0), (-1,-1), 1, colors.black),
         ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('SPAN', (0, 0), (3, 0)),
-        ('SPAN', (0, 1), (3, 1)),
-        ('SPAN', (1, 2), (3, 2)),
-        ('SPAN', (1, 3), (3, 3)),
-        ('SPAN', (1, 4), (3, 4)),
-        ('SPAN', (1, 5), (3, 5)),
-        ('SPAN', (0, 6), (3, 6)),
-        ('SPAN', (1, 7), (3, 7)),
-        ('SPAN', (1, 8), (3, 8)),
-        ('SPAN', (1, 9), (3, 9)),
-        ('SPAN', (1, 10), (3, 10)),
-        ('SPAN', (0, 11), (3, 11)),
-        ('SPAN', (1, 12), (3, 12)),
-        ('SPAN', (1, 13), (3, 13)),
-        ('SPAN', (1, 14), (3, 14)),
-        ('SPAN', (1, 15), (3, 15)),
+        ('SPAN', (0, 0), (3, 0)), ('SPAN', (0, 1), (3, 1)),
+        ('SPAN', (1, 2), (3, 2)), ('SPAN', (1, 3), (3, 3)), ('SPAN', (1, 4), (3, 4)), ('SPAN', (1, 5), (3, 5)),
+        ('SPAN', (0, 6), (3, 6)), ('SPAN', (1, 7), (3, 7)), ('SPAN', (1, 8), (3, 8)), ('SPAN', (1, 9), (3, 9)), ('SPAN', (1, 10), (3, 10)),
+        ('SPAN', (0, 11), (3, 11)), ('SPAN', (1, 12), (3, 12)), ('SPAN', (1, 13), (3, 13)), ('SPAN', (1, 14), (3, 14)), ('SPAN', (1, 15), (3, 15)),
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke),
         ('BACKGROUND', (0, 6), (-1, 6), colors.whitesmoke),
@@ -253,13 +215,16 @@ def generar_pdf_tabla_coco(registro):
     ]))
     
     elementos.append(t_fq)
-    elementos.append(Spacer(1, 15))
+    elementos.append(Spacer(1, 10))
 
-    # 4. Firma del Jefe de Calidad al pie
+    # 4. Firma del Jefe de Calidad
     nombre_firma = registro.get("Firma_Jefe", "Sin firma")
     ruta_firma = os.path.join(FIRMAS_DIR, str(nombre_firma))
     
-    firma_img = RLImage(ruta_firma, width=140, height=45, preserveAspectRatio=True) if (nombre_firma != "Sin firma" and os.path.exists(ruta_firma)) else Paragraph("Pendiente de firma", style_celda)
+    if nombre_firma != "Sin firma" and os.path.exists(ruta_firma):
+        firma_img = RLImage(ruta_firma, width=130, height=40, preserveAspectRatio=True)
+    else:
+        firma_img = Paragraph("Pendiente de firma", style_celda)
     
     firma_data = [
         [firma_img],
