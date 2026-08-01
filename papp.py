@@ -3,18 +3,20 @@ import pandas as pd
 import os
 from datetime import datetime
 from streamlit_drawable_canvas import st_canvas
-import fitz  # PyMuPDF para manejar el PDF
+import io
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas as pdf_canvas
 
 # Configuración inicial de la página
-st.set_page_config(page_title="Control de Recepción de Coco - LIF Brands", layout="wide")
+st.set_page_config(page_title="Control de Recepción - LIF Brands", layout="wide")
 
 # ==========================================
-# ESTILOS CSS CON IDENTIDAD VISUAL LIF BRANDS
+# ESTILOS CSS CORREGIDOS (Garantiza lectura de texto)
 # ==========================================
 st.markdown("""
 <style>
 .stApp { background-color: #FFFFFF !important; }
-html, body, [class*="css"], p, span, label { font-family: Arial, sans-serif !important; color: #000000 !important; }
+html, body, [class*="css"], p, span, label { font-family: Arial, sans-serif !important; color: #1e293b !important; }
 h1, h2, h3, h4, h5, h6 { color: #1e3a8a !important; font-family: Arial, sans-serif !important; }
 .stTextInput label, .stSelectbox label, .stDateInput label, .stNumberInput label, .stRadio label, .stFileUploader label {
     color: #1e3a8a !important;
@@ -42,17 +44,27 @@ button[kind="primary"]:hover {
 }
 input, select {
     background-color: #f8fafc !important;
-    color: #000000 !important;
+    color: #0f172a !important;
     border: 1px solid #cbd5e1 !important;
     border-radius: 4px;
 }
+/* Tarjetas del panel administrador con texto oscuro forzado */
 .card-seccion {
     padding: 15px;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
     margin-bottom: 15px;
-    background-color: #f8fafc;
+    background-color: #f1f5f9 !important;
     border-left: 5px solid #1e3a8a;
+    color: #0f172a !important; 
+}
+.card-seccion b, .card-seccion span, .card-seccion p {
+    color: #0f172a !important;
+}
+/* Estilo para expanders */
+.streamlit-expanderHeader {
+    color: #1e3a8a !important;
+    font-weight: bold !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -63,13 +75,10 @@ if not os.path.exists(FIRMAS_DIR):
     os.makedirs(FIRMAS_DIR)
 
 EXCEL_FILE = "registros_recepcion_coco.xlsx"
-PDF_PLANTILLA = "R ICC15.2 - Control de recepción Coco.pdf"
 
 def mostrar_logo(ancho=160):
     if os.path.exists("logo.png"):
         st.image("logo.png", width=ancho)
-    else:
-        st.warning("⚠️ Logo no encontrado. Asegúrate de tener 'logo.png' en el repositorio.")
 
 def cargar_datos():
     if os.path.exists(EXCEL_FILE):
@@ -79,58 +88,106 @@ def cargar_datos():
 def guardar_datos(df):
     df.to_excel(EXCEL_FILE, index=False)
 
-# Función optimizada para rellenar el PDF con los textos bien posicionados
-def generar_pdf_relleno(registro):
-    if not os.path.exists(PDF_PLANTILLA):
-        return None
-    
-    doc = fitz.open(PDF_PLANTILLA)
-    pagina = doc[0]
-    
-    # Coordenadas ajustadas para evitar sobreposición y asegurar legibilidad
-    coordenadas = {
-        "Responsable": (210, 150),
-        "Fecha": (460, 150),
-        "Hora": (650, 150),
-        "Desc_Materia": (210, 178),
-        "Observaciones": (500, 185),
-        "Proveedor": (210, 205),
-        "Total_Fruta": (210, 235),
-        "Cant_Unidades": (210, 260),
-        
-        # Muestra 1
-        "unidades_galon_1": (210, 325),
-        "volumen_1": (210, 350),
-        "brix_1": (210, 375),
-        "ph_1": (210, 400),
-        
-        # Muestra 2
-        "unidades_galon_2": (210, 440),
-        "volumen_2": (210, 465),
-        "brix_2": (210, 490),
-        "ph_2": (210, 515),
-        
-        # Muestra 3
-        "unidades_galon_3": (210, 555),
-        "volumen_3": (210, 580),
-        "brix_3": (210, 605),
-        "ph_3": (210, 630),
-    }
+def eliminar_registro(id_registro):
+    df = cargar_datos()
+    df = df[df["ID_Registro"] != id_registro]
+    guardar_datos(df)
+    st.success(f"Registro #{id_registro} eliminado correctamente.")
 
-    for campo, coord in coordenadas.items():
-        valor = str(registro.get(campo, ""))
-        pagina.insert_text(coord, valor, fontsize=9, color=(0, 0, 0))
-
+# ==========================================
+# GENERADOR DE PDF DESDE CERO (Formato Limpio)
+# ==========================================
+def generar_pdf_nuevo(registro):
+    buffer = io.BytesIO()
+    c = pdf_canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    
+    # 1. Encabezado
+    if os.path.exists("logo.png"):
+        c.drawImage("logo.png", 40, height - 80, width=120, height=50, preserveAspectRatio=True, mask='auto')
+    
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(width / 2.0, height - 50, "Control de Recepción de Coco")
+    
+    c.setFont("Helvetica", 9)
+    c.drawString(width - 160, height - 40, "Código: R ICC/15-2")
+    c.drawString(width - 160, height - 52, "Versión: 02")
+    c.drawString(width - 160, height - 64, f"ID de Sistema: #{registro.get('ID_Registro', '')}")
+    
+    c.line(40, height - 90, width - 40, height - 90)
+    
+    # 2. Datos Generales (Estructura tipo tabla)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, height - 110, "Datos Generales")
+    
+    c.setFont("Helvetica", 10)
+    y = height - 130
+    c.drawString(40, y, f"Responsable: {registro.get('Responsable', '')}")
+    c.drawString(300, y, f"Fecha: {registro.get('Fecha', '')}")
+    c.drawString(460, y, f"Hora: {registro.get('Hora', '')}")
+    
+    y -= 20
+    c.drawString(40, y, f"Materia Prima: {registro.get('Desc_Materia', '')}")
+    c.drawString(300, y, f"Total de Fruta Ingresada: {registro.get('Total_Fruta', '')}")
+    
+    y -= 20
+    c.drawString(40, y, f"Proveedor: {registro.get('Proveedor', '')}")
+    c.drawString(300, y, f"Cantidad Unidades (Muestra): {registro.get('Cant_Unidades', '')}")
+    
+    y -= 20
+    c.drawString(40, y, f"Observaciones: {registro.get('Observaciones', 'Ninguna')}")
+    
+    c.line(40, y - 10, width - 40, y - 10)
+    
+    # 3. Parámetros Fisicoquímicos (Tabla)
+    y -= 30
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "Parámetros Fisicoquímicos")
+    
+    y -= 25
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(40, y, "Métricas")
+    c.drawString(200, y, "Muestra 1")
+    c.drawString(320, y, "Muestra 2")
+    c.drawString(440, y, "Muestra 3")
+    
+    y -= 10
+    c.line(40, y, width - 40, y)
+    
+    y -= 15
+    c.setFont("Helvetica", 10)
+    parametros = ["Unidades/Galón", "Volumen", "Brix° (5 - 5.9)", "pH"]
+    keys = ["unidades_galon", "volumen", "brix", "ph"]
+    
+    for param, key in zip(parametros, keys):
+        c.drawString(40, y, param)
+        c.drawString(200, y, str(registro.get(f"{key}_1", "")))
+        c.drawString(320, y, str(registro.get(f"{key}_2", "")))
+        c.drawString(440, y, str(registro.get(f"{key}_3", "")))
+        y -= 20
+    
+    c.line(40, y + 5, width - 40, y + 5)
+    
+    # 4. Firmas y Estado
+    y -= 30
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "Aprobación y Resolución")
+    
+    y -= 20
+    c.setFont("Helvetica", 10)
+    c.drawString(40, y, f"Estado del Registro: {registro.get('Estado', '')}")
+    
     nombre_firma = registro.get("Firma_Jefe", "Sin firma")
     ruta_firma = os.path.join(FIRMAS_DIR, str(nombre_firma))
     
     if nombre_firma != "Sin firma" and os.path.exists(ruta_firma):
-        rectangulo_firma = fitz.Rect(230, 675, 380, 725)
-        pagina.insert_image(rectangulo_firma, filename=ruta_firma)
-
-    pdf_bytes = doc.write()
-    doc.close()
-    return pdf_bytes
+        c.drawImage(ruta_firma, 40, y - 60, width=120, height=45, preserveAspectRatio=True, mask='auto')
+        c.line(40, y - 65, 180, y - 65)
+        c.drawString(40, y - 80, "Firma de V°B° Calidad")
+    
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
 
 # Control de navegación y estados de sesión
 if "nav_state" not in st.session_state: 
@@ -150,7 +207,7 @@ if st.session_state["nav_state"] == "home":
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
         mostrar_logo(200)
-        st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>Control de Recepción de Coco</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center;'>Control de Recepción de Coco</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; color: #65a30d; font-weight: bold;'>LIF Brands Aseguramiento de Calidad</p>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -173,7 +230,7 @@ elif st.session_state["nav_state"] == "form_login":
             st.session_state["nav_state"] = "home"
             st.rerun()
         st.title("Acceso a Registro")
-        st.markdown("Ingrese la contraseña autorizada (`20lf26`) para reportar un nuevo ingreso:")
+        st.markdown("Ingrese la contraseña autorizada (`20lf26`):")
         
         password_form = st.text_input("Contraseña de ingreso", type="password")
         if st.button("Verificar Acceso", use_container_width=True, type="primary"):
@@ -201,13 +258,13 @@ elif st.session_state["nav_state"] == "form":
     st.title("Registro de Recepción de Coco")
     
     if st.session_state["enviado_exitoso"]:
-        st.success("¡Registro enviado con éxito! Quedará pendiente de validación por el Jefe de Calidad.")
-        col_b1, col_b2 = st.columns(2)
-        with col_b1:
+        st.success("¡Registro enviado con éxito! Quedará pendiente de validación.")
+        c_btn1, c_btn2 = st.columns(2)
+        with c_btn1:
             if st.button("➕ Ingresar un nuevo registro", use_container_width=True, type="primary"):
                 st.session_state["enviado_exitoso"] = False
                 st.rerun()
-        with col_b2:
+        with c_btn2:
             if st.button("🏠 Volver al inicio", use_container_width=True):
                 st.session_state["enviado_exitoso"] = False
                 st.session_state["form_logueado"] = False
@@ -233,7 +290,7 @@ elif st.session_state["nav_state"] == "form":
                 desc_materia = st.text_input("Descripción de materia prima", value="Coco")
             with c2:
                 fecha = st.date_input("Fecha")
-                total_fruta = st.number_input("Total de Fruta Ingresada Planta", min_value=0.0, value=0.0)
+                total_fruta = st.number_input("Total de Fruta Ingresada", min_value=0.0, value=0.0)
             with c3:
                 hora = st.time_input("Hora")
                 observaciones = st.text_area("Observaciones", value="Ninguna")
@@ -273,14 +330,9 @@ elif st.session_state["nav_state"] == "form":
                     nuevo_registro = {
                         "ID_Registro": datetime.now().strftime("%Y%m%d%H%M%S"),
                         "Estado": "Pendiente",
-                        "Responsable": responsable, 
-                        "Fecha": str(fecha), 
-                        "Hora": str(hora),
-                        "Desc_Materia": desc_materia, 
-                        "Observaciones": observaciones,
-                        "Proveedor": proveedor_a_guardar, 
-                        "Total_Fruta": total_fruta, 
-                        "Cant_Unidades": cant_unidades,
+                        "Responsable": responsable, "Fecha": str(fecha), "Hora": str(hora),
+                        "Desc_Materia": desc_materia, "Observaciones": observaciones,
+                        "Proveedor": proveedor_a_guardar, "Total_Fruta": total_fruta, "Cant_Unidades": cant_unidades,
                         "unidades_galon_1": ug_1, "volumen_1": v_1, "brix_1": b_1, "ph_1": ph_1,
                         "unidades_galon_2": ug_2, "volumen_2": v_2, "brix_2": b_2, "ph_2": ph_2,
                         "unidades_galon_3": ug_3, "volumen_3": v_3, "brix_3": b_3, "ph_3": ph_3,
@@ -303,7 +355,7 @@ elif st.session_state["nav_state"] == "admin_login":
             st.rerun()
             
         st.title("Panel de Administrador")
-        st.markdown("Ingrese la contraseña de administrador (`glad726lif`) para acceder a los registros.")
+        st.markdown("Ingrese la contraseña de administrador (`glad726lif`):")
         
         password_input = st.text_input("Contraseña de administrador", type="password")
         if st.button("Verificar Acceso", use_container_width=True, type="primary"):
@@ -315,7 +367,7 @@ elif st.session_state["nav_state"] == "admin_login":
                 st.error("Contraseña incorrecta.")
 
 # ==========================================
-# 5. DASHBOARD DEL ADMINISTRADOR (ESTILO INSPECCIÓN CORPORATIVA)
+# 5. DASHBOARD DEL ADMINISTRADOR
 # ==========================================
 elif st.session_state["nav_state"] == "admin_dashboard":
     if not st.session_state.get("admin_logueado", False):
@@ -342,7 +394,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             "📊 Historial Completo de Registros"
         ])
         
-        # PESTAÑA 1: PENDIENTES (ESTILO TARJETAS LIMPIAS)
+        # PESTAÑA 1: PENDIENTES
         with tab_pendientes:
             df_pendientes = df[df["Estado"] == "Pendiente"]
             if df_pendientes.empty:
@@ -357,6 +409,11 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                     Hora: {row['Hora']} | Observaciones: {row['Observaciones']}
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    # Botón para eliminar registro de prueba
+                    if st.button(f"🗑️ Eliminar Registro #{row['ID_Registro']}", key=f"del_pen_{row['ID_Registro']}"):
+                        eliminar_registro(row['ID_Registro'])
+                        st.rerun()
                     
                     with st.expander(f"🔍 Revisar y completar aprobación (ID: #{row['ID_Registro']})"):
                         st.markdown("#### Parámetros Registrados:")
@@ -399,6 +456,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                                 st.rerun()
                             else:
                                 st.warning("Por favor dibuje la firma antes de validar.")
+                    st.markdown("---")
 
         # PESTAÑA 2: APROBADOS
         with tab_aprobados:
@@ -407,12 +465,18 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                 st.info("Aún no hay registros aprobados.")
             else:
                 for idx, row in df_aprobados.iterrows():
-                    st.markdown(f"""
-                    <div class="card-seccion">
-                    <b>✅ ID: {row['ID_Registro']} | Proveedor: {row['Proveedor']}</b><br>
-                    Fecha: {row['Fecha']} | Responsable: {row['Responsable']} | Estado: Aprobado
-                    </div>
-                    """, unsafe_allow_html=True)
+                    col_info, col_del = st.columns([5, 1])
+                    with col_info:
+                        st.markdown(f"""
+                        <div class="card-seccion">
+                        <b>✅ ID: {row['ID_Registro']} | Proveedor: {row['Proveedor']}</b><br>
+                        Fecha: {row['Fecha']} | Responsable: {row['Responsable']} | Estado: Aprobado
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with col_del:
+                        if st.button("🗑️", key=f"del_apr_{row['ID_Registro']}", help="Eliminar registro"):
+                            eliminar_registro(row['ID_Registro'])
+                            st.rerun()
 
         # PESTAÑA 3: HISTORIAL COMPLETO
         with tab_todos:
@@ -433,6 +497,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             
             for idx, row in df_filtrado.iterrows():
                 estado_badge = "🟢 Aprobado" if row["Estado"] == "Aprobado" else "🟠 Pendiente"
+                
                 with st.container():
                     st.markdown(f"""
                     <div class="card-seccion">
@@ -440,11 +505,18 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    if row["Estado"] == "Aprobado":
-                        pdf_bytes = generar_pdf_relleno(row.to_dict())
-                        if pdf_bytes:
+                    c_btn1, c_btn2 = st.columns([2, 8])
+                    
+                    with c_btn1:
+                        if st.button("🗑️ Eliminar", key=f"del_tod_{row['ID_Registro']}"):
+                            eliminar_registro(row['ID_Registro'])
+                            st.rerun()
+                    
+                    with c_btn2:
+                        if row["Estado"] == "Aprobado":
+                            pdf_bytes = generar_pdf_nuevo(row.to_dict())
                             st.download_button(
-                                label=f"📥 Descargar PDF Relleno y Firmado (#{row['ID_Registro']})",
+                                label=f"📥 Descargar PDF Relleno y Firmado",
                                 data=pdf_bytes,
                                 file_name=f"Control_Coco_{row['ID_Registro']}.pdf",
                                 mime="application/pdf",
