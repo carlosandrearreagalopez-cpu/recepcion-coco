@@ -3,5 +3,4 @@ pandas
 openpyxl
 streamlit-drawable-canvas
 Pillow
-PyMuPDF
 reportlab
