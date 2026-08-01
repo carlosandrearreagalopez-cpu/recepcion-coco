@@ -4,13 +4,11 @@ import os
 from datetime import datetime
 from streamlit_drawable_canvas import st_canvas
 import io
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas as pdf_canvas
 
 # Configuración inicial de la página
-st.set_page_config(page_title="Control de Recepción de Coco - LIF Brands", layout="wide")
+st.set_page_config(page_title="Control de Recepción - LIF Brands", layout="wide")
 
 # ==========================================
 # ESTILOS CSS CORREGIDOS (Garantiza lectura de texto)
@@ -50,6 +48,7 @@ input, select {
     border: 1px solid #cbd5e1 !important;
     border-radius: 4px;
 }
+/* Tarjetas del panel administrador con texto oscuro forzado */
 .card-seccion {
     padding: 15px;
     border: 1px solid #cbd5e1;
@@ -61,6 +60,11 @@ input, select {
 }
 .card-seccion b, .card-seccion span, .card-seccion p {
     color: #0f172a !important;
+}
+/* Estilo para expanders */
+.streamlit-expanderHeader {
+    color: #1e3a8a !important;
+    font-weight: bold !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -91,155 +95,97 @@ def eliminar_registro(id_registro):
     st.success(f"Registro #{id_registro} eliminado correctamente.")
 
 # ==========================================
-# GENERADOR DE PDF EN FORMATO TABLA (HORIZONTAL)
+# GENERADOR DE PDF DESDE CERO (Formato Limpio)
 # ==========================================
-def generar_pdf_tabla_coco(registro):
+def generar_pdf_nuevo(registro):
     buffer = io.BytesIO()
-    # Hoja en formato Horizontal (Landscape) para evitar sobreposición y dar espacio de tabla
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter),
-                            rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    c = pdf_canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
     
-    elementos = []
-    styles = getSampleStyleSheet()
+    # 1. Encabezado
+    if os.path.exists("logo.png"):
+        c.drawImage("logo.png", 40, height - 80, width=120, height=50, preserveAspectRatio=True, mask='auto')
     
-    style_titulo = ParagraphStyle(
-        'TituloFormato', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=13, alignment=1, textColor=colors.black
-    )
-    style_header_info = ParagraphStyle(
-        'HeaderInfo', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=8, textColor=colors.black
-    )
-    style_celda = ParagraphStyle(
-        'CeldaTexto', parent=styles['Normal'],
-        fontName='Helvetica', fontSize=9, textColor=colors.black
-    )
-    style_celda_bold = ParagraphStyle(
-        'CeldaTextoBold', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=9, textColor=colors.black
-    )
-    style_sub = ParagraphStyle(
-        'SubTabla', parent=styles['Normal'],
-        fontName='Helvetica-Bold', fontSize=9, alignment=1, textColor=colors.black
-    )
-
-    # 1. Cabecera Principal
-    logo_path = "logo.png" if os.path.exists("logo.png") else None
-    logo_elem = RLImage(logo_path, width=70, height=35) if logo_path else Paragraph("LIF", style_celda_bold)
-
-    info_derecha = Paragraph(
-        "<b>Código:</b> R ICC/15-2<br/>"
-        "<b>Versión:</b> 02<br/>"
-        "<b>Aprobación:</b> 24/10/2017<br/>"
-        "<b>Revisión:</b> 21/09/2020", style_header_info
-    )
-    titulo_elem = Paragraph("<b>Control de Recepción de Coco</b>", style_titulo)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(width / 2.0, height - 50, "Control de Recepción de Coco")
     
-    header_table_data = [[logo_elem, titulo_elem, info_derecha]]
-    header_table = Table(header_table_data, colWidths=[100, 500, 192])
-    header_table.setStyle(TableStyle([
-        ('BOX', (0,0), (-1,-1), 1, colors.black),
-        ('INNERGRID', (0,0), (-1,-1), 1, colors.black),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('ALIGN', (1,0), (1,0), 'CENTER'),
-    ]))
+    c.setFont("Helvetica", 9)
+    c.drawString(width - 160, height - 40, "Código: R ICC/15-2")
+    c.drawString(width - 160, height - 52, "Versión: 02")
+    c.drawString(width - 160, height - 64, f"ID de Sistema: #{registro.get('ID_Registro', '')}")
     
-    elementos.append(header_table)
-    elementos.append(Spacer(1, 4))
-
-    # 2. Datos Generales (Estructura de Tabla Cuadriculada con espacios amplios)
-    datos_generales = [
-        [Paragraph("<b>Nombre del responsable:</b>", style_celda), Paragraph(str(registro.get('Responsable', '')), style_celda), 
-         Paragraph("<b>Fecha:</b>", style_celda), Paragraph(str(registro.get('Fecha', '')), style_celda),
-         Paragraph("<b>Hora:</b>", style_celda), Paragraph(str(registro.get('Hora', '')), style_celda)],
-        
-        [Paragraph("<b>Descripción de materia prima:</b>", style_celda), Paragraph(str(registro.get('Desc_Materia', '')), style_celda), 
-         Paragraph("<b>Observaciones:</b>", style_celda_bold), Paragraph(str(registro.get('Observaciones', '')), style_celda), "", ""],
-        
-        [Paragraph("<b>Nombre del proveedor:</b>", style_celda), Paragraph(str(registro.get('Proveedor', '')), style_celda), "", "", "", ""],
-        
-        [Paragraph("<b>Total de Fruta Ingresada Planta:</b>", style_celda), Paragraph(str(registro.get('Total_Fruta', '')), style_celda), "", "", "", ""],
-        
-        [Paragraph("<b>Cantidad Unidades (Muestra):</b>", style_celda), Paragraph(str(registro.get('Cant_Unidades', '')), style_celda), "", "", "", ""]
-    ]
-
-    t_gen = Table(datos_generales, colWidths=[160, 200, 60, 110, 60, 202])
-    t_gen.setStyle(TableStyle([
-        ('BOX', (0,0), (-1,-1), 1, colors.black),
-        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('SPAN', (3, 1), (5, 1)), 
-        ('SPAN', (1, 2), (5, 2)), 
-        ('SPAN', (1, 3), (5, 3)), 
-        ('SPAN', (1, 4), (5, 4)), 
-    ]))
+    c.line(40, height - 90, width - 40, height - 90)
     
-    elementos.append(t_gen)
-    elementos.append(Spacer(1, 4))
-
-    # 3. Parámetros Fisicoquímicos (Muestras en formato tabla limpia)
-    tabla_fq_data = [
-        [Paragraph("<b>PARÁMETROS FISICOQUÍMICOS</b>", style_sub), "", "", ""],
-        [Paragraph("<b>Muestra 1</b>", style_sub), "", "", ""],
-        [Paragraph("Unidades/Galón", style_celda), Paragraph(str(registro.get('unidades_galon_1', '')), style_celda), "", ""],
-        [Paragraph("Volumen (Muestra)", style_celda), Paragraph(str(registro.get('volumen_1', '')), style_celda), "", ""],
-        [Paragraph("Brix° (5 - 5.9)", style_celda), Paragraph(str(registro.get('brix_1', '')), style_celda), "", ""],
-        [Paragraph("pH", style_celda), Paragraph(str(registro.get('ph_1', '')), style_celda), "", ""],
-        
-        [Paragraph("<b>Muestra 2</b>", style_sub), "", "", ""],
-        [Paragraph("Unidades/Galón", style_celda), Paragraph(str(registro.get('unidades_galon_2', '')), style_celda), "", ""],
-        [Paragraph("Volumen (Muestra)", style_celda), Paragraph(str(registro.get('volumen_2', '')), style_celda), "", ""],
-        [Paragraph("Brix° (5 - 5.9)", style_celda), Paragraph(str(registro.get('brix_2', '')), style_celda), "", ""],
-        [Paragraph("pH", style_celda), Paragraph(str(registro.get('ph_2', '')), style_celda), "", ""],
-
-        [Paragraph("<b>Muestra 3</b>", style_sub), "", "", ""],
-        [Paragraph("Unidades/Galón", style_celda), Paragraph(str(registro.get('unidades_galon_3', '')), style_celda), "", ""],
-        [Paragraph("Volumen (Muestra)", style_celda), Paragraph(str(registro.get('volumen_3', '')), style_celda), "", ""],
-        [Paragraph("Brix° (5 - 5.9)", style_celda), Paragraph(str(registro.get('brix_3', '')), style_celda), "", ""],
-        [Paragraph("pH", style_celda), Paragraph(str(registro.get('ph_3', '')), style_celda), "", ""],
-    ]
-
-    t_fq = Table(tabla_fq_data, colWidths=[200, 252, 140, 200])
-    t_fq.setStyle(TableStyle([
-        ('BOX', (0,0), (-1,-1), 1, colors.black),
-        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('SPAN', (0, 0), (3, 0)), ('SPAN', (0, 1), (3, 1)),
-        ('SPAN', (1, 2), (3, 2)), ('SPAN', (1, 3), (3, 3)), ('SPAN', (1, 4), (3, 4)), ('SPAN', (1, 5), (3, 5)),
-        ('SPAN', (0, 6), (3, 6)), ('SPAN', (1, 7), (3, 7)), ('SPAN', (1, 8), (3, 8)), ('SPAN', (1, 9), (3, 9)), ('SPAN', (1, 10), (3, 10)),
-        ('SPAN', (0, 11), (3, 11)), ('SPAN', (1, 12), (3, 12)), ('SPAN', (1, 13), (3, 13)), ('SPAN', (1, 14), (3, 14)), ('SPAN', (1, 15), (3, 15)),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke),
-        ('BACKGROUND', (0, 6), (-1, 6), colors.whitesmoke),
-        ('BACKGROUND', (0, 11), (-1, 11), colors.whitesmoke),
-    ]))
+    # 2. Datos Generales (Estructura tipo tabla)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, height - 110, "Datos Generales")
     
-    elementos.append(t_fq)
-    elementos.append(Spacer(1, 10))
-
-    # 4. Firma del Jefe de Calidad
+    c.setFont("Helvetica", 10)
+    y = height - 130
+    c.drawString(40, y, f"Responsable: {registro.get('Responsable', '')}")
+    c.drawString(300, y, f"Fecha: {registro.get('Fecha', '')}")
+    c.drawString(460, y, f"Hora: {registro.get('Hora', '')}")
+    
+    y -= 20
+    c.drawString(40, y, f"Materia Prima: {registro.get('Desc_Materia', '')}")
+    c.drawString(300, y, f"Total de Fruta Ingresada: {registro.get('Total_Fruta', '')}")
+    
+    y -= 20
+    c.drawString(40, y, f"Proveedor: {registro.get('Proveedor', '')}")
+    c.drawString(300, y, f"Cantidad Unidades (Muestra): {registro.get('Cant_Unidades', '')}")
+    
+    y -= 20
+    c.drawString(40, y, f"Observaciones: {registro.get('Observaciones', 'Ninguna')}")
+    
+    c.line(40, y - 10, width - 40, y - 10)
+    
+    # 3. Parámetros Fisicoquímicos (Tabla)
+    y -= 30
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "Parámetros Fisicoquímicos")
+    
+    y -= 25
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(40, y, "Métricas")
+    c.drawString(200, y, "Muestra 1")
+    c.drawString(320, y, "Muestra 2")
+    c.drawString(440, y, "Muestra 3")
+    
+    y -= 10
+    c.line(40, y, width - 40, y)
+    
+    y -= 15
+    c.setFont("Helvetica", 10)
+    parametros = ["Unidades/Galón", "Volumen", "Brix° (5 - 5.9)", "pH"]
+    keys = ["unidades_galon", "volumen", "brix", "ph"]
+    
+    for param, key in zip(parametros, keys):
+        c.drawString(40, y, param)
+        c.drawString(200, y, str(registro.get(f"{key}_1", "")))
+        c.drawString(320, y, str(registro.get(f"{key}_2", "")))
+        c.drawString(440, y, str(registro.get(f"{key}_3", "")))
+        y -= 20
+    
+    c.line(40, y + 5, width - 40, y + 5)
+    
+    # 4. Firmas y Estado
+    y -= 30
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "Aprobación y Resolución")
+    
+    y -= 20
+    c.setFont("Helvetica", 10)
+    c.drawString(40, y, f"Estado del Registro: {registro.get('Estado', '')}")
+    
     nombre_firma = registro.get("Firma_Jefe", "Sin firma")
     ruta_firma = os.path.join(FIRMAS_DIR, str(nombre_firma))
     
     if nombre_firma != "Sin firma" and os.path.exists(ruta_firma):
-        firma_img = RLImage(ruta_firma, width=130, height=40, preserveAspectRatio=True)
-    else:
-        firma_img = Paragraph("Pendiente de firma", style_celda)
+        c.drawImage(ruta_firma, 40, y - 60, width=120, height=45, preserveAspectRatio=True, mask='auto')
+        c.line(40, y - 65, 180, y - 65)
+        c.drawString(40, y - 80, "Firma de V°B° Calidad")
     
-    firma_data = [
-        [firma_img],
-        [Paragraph("________________________________________", style_sub)],
-        [Paragraph("<b>Jefe de Calidad</b>", style_sub)]
-    ]
-    t_firma = Table(firma_data, colWidths=[250])
-    t_firma.setStyle(TableStyle([
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
-    
-    elementos.append(t_firma)
-
-    doc.build(elementos)
+    c.save()
     buffer.seek(0)
     return buffer.getvalue()
 
@@ -448,6 +394,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             "📊 Historial Completo de Registros"
         ])
         
+        # PESTAÑA 1: PENDIENTES
         with tab_pendientes:
             df_pendientes = df[df["Estado"] == "Pendiente"]
             if df_pendientes.empty:
@@ -458,11 +405,12 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                     <div class="card-seccion">
                     <b>Registrado el {row['Fecha']} por {row['Responsable']} · Estado: Pendiente de revisión</b><br><br>
                     <b>📦 Datos Generales:</b><br>
-                    Proveedor: {row['Proveedor']} | Materia Prima: {row['Desc_Materia']} | Total Fruta: {row['Total_Fruta']}<br>
+                    Proveedor: {row['Proveedor']} | Materia Prima: {row['Desc_Materia']} | Total Fruta: {row['Total_Fruta']} L<br>
                     Hora: {row['Hora']} | Observaciones: {row['Observaciones']}
                     </div>
                     """, unsafe_allow_html=True)
                     
+                    # Botón para eliminar registro de prueba
                     if st.button(f"🗑️ Eliminar Registro #{row['ID_Registro']}", key=f"del_pen_{row['ID_Registro']}"):
                         eliminar_registro(row['ID_Registro'])
                         st.rerun()
@@ -510,6 +458,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                                 st.warning("Por favor dibuje la firma antes de validar.")
                     st.markdown("---")
 
+        # PESTAÑA 2: APROBADOS
         with tab_aprobados:
             df_aprobados = df[df["Estado"] == "Aprobado"]
             if df_aprobados.empty:
@@ -529,6 +478,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                             eliminar_registro(row['ID_Registro'])
                             st.rerun()
 
+        # PESTAÑA 3: HISTORIAL COMPLETO
         with tab_todos:
             col_f1, col_f2 = st.columns(2)
             with col_f1:
@@ -564,7 +514,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                     
                     with c_btn2:
                         if row["Estado"] == "Aprobado":
-                            pdf_bytes = generar_pdf_tabla_coco(row.to_dict())
+                            pdf_bytes = generar_pdf_nuevo(row.to_dict())
                             st.download_button(
                                 label=f"📥 Descargar PDF Relleno y Firmado",
                                 data=pdf_bytes,
