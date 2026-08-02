@@ -157,7 +157,6 @@ def cargar_datos():
             if col not in df.columns:
                 df[col] = val_default
         
-        # Forzar tipos de columnas críticas como string para evitar errores en Pandas
         df["Observaciones_Jefe"] = df["Observaciones_Jefe"].astype(str)
         df["Estado"] = df["Estado"].astype(str)
         df["Firma_Jefe"] = df["Firma_Jefe"].astype(str)
@@ -572,7 +571,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                                 st.error("Debe proporcionar o dibujar una firma válida.")
                                 st.stop()
 
-                        # Recargar datos frescos y forzar tipos string en las columnas antes de actualizar
                         df_act = cargar_datos()
                         df_act["Estado"] = df_act["Estado"].astype(str)
                         df_act["Firma_Jefe"] = df_act["Firma_Jefe"].astype(str)
@@ -622,9 +620,18 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             for idx, row in df_rec.iterrows():
                 render_tarjeta(row, "rec")
 
-    # --- PESTAÑA: TODOS Y DESCARGA EXCEL ---
+    # --- PESTAÑA: REGISTROS Y DESCARGA EXCEL ---
     with tab_todos:
         st.write("### Historial Completo y Descarga")
+        
+        # Tarjetas de métricas en la pestaña de Registros
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        col_m1.metric("⏳ Pendientes", total_pen)
+        col_m2.metric("✅ Aprobados", total_apr)
+        col_m3.metric("❌ Rechazados", total_rec)
+        col_m4.metric("📊 Total Registros", total_reg)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         if not df.empty:
             excel_bytes = generar_excel_bytes(df)
             st.download_button(
