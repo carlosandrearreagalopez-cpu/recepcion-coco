@@ -54,25 +54,13 @@ button[kind="primary"]:hover {
     background-color: #0f766e !important;
 }
 
-/* Botones Secundarios */
-.stButton>button {
-    background-color: #FFFFFF !important;
-    color: #115e59 !important;
-    border: 1px solid #115e59 !important;
-    border-radius: 6px !important;
-    font-weight: bold;
-}
-.stButton>button:hover {
-    background-color: #f0fdf4 !important;
-}
-
 /* Tarjetas (Cards) de Registros */
 .record-card {
     background-color: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     padding: 16px;
-    margin-bottom: 12px;
+    margin-bottom: 5px; /* Reducido para que pegue con el expander */
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     border-left: 5px solid #0f766e;
 }
@@ -93,11 +81,13 @@ button[kind="primary"]:hover {
     background-color: #f8fafc !important;
     border-radius: 4px;
     font-weight: bold !important;
+    border: 1px solid #e2e8f0;
 }
 .streamlit-expanderContent {
     background-color: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
     border-top: none !important;
+    padding: 20px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -125,11 +115,9 @@ def guardar_datos(df):
 
 def eliminar_registro(id_registro, idx_excel):
     df = cargar_datos()
-    # Eliminamos por índice para asegurar que si hay IDs duplicados solo borremos el correcto
     if idx_excel in df.index:
         df = df.drop(index=idx_excel)
     else:
-        # Fallback por si acaso
         df = df[df["ID_Registro"] != id_registro]
     guardar_datos(df)
     st.success(f"Registro eliminado correctamente.")
@@ -365,60 +353,81 @@ elif st.session_state["nav_state"] == "admin_dashboard":
     
     tab_pendientes, tab_aprobados, tab_todos = st.tabs(["⏳ Pendientes", "✅ Aprobados", "📊 Todos"])
     
-    # FUNCIONES DE RENDERIZADO DE TARJETAS
-    # ¡NUEVO!: Se agregó idx (índice de la fila) a todos los identificadores para evitar errores por duplicados en la base de datos
+    # FUNCIONES DE RENDERIZADO DE TARJETAS REDISEÑADAS
     def render_tarjeta(row, index_key, idx):
         estado_icono = "⏳" if row['Estado'] == "Pendiente" else "✅"
+        
+        # 1. El cuadro visible inicial (Cabecera)
         st.markdown(f"""
         <div class="record-card">
-            <div class="record-header">{estado_icono} #{row['ID_Registro']} — {row['Proveedor']} · {row['Desc_Materia']}</div>
-            <div class="record-sub">Bodega Materia Prima | Fecha: {row['Fecha']} | Receptor: {row['Responsable']} | Estado: <b>{row['Estado']}</b></div>
+            <div class="record-header">{estado_icono} #{row['ID_Registro']} — {row['Proveedor']}</div>
+            <div class="record-sub">Materia: {row['Desc_Materia']} | Fecha: {row['Fecha']} | Receptor: {row['Responsable']} | Estado: <b>{row['Estado']}</b></div>
         </div>
         """, unsafe_allow_html=True)
         
-        c_btn1, c_btn2, c_btn3 = st.columns([2, 2, 8])
-        
-        with c_btn1:
-            if st.button("🗑️ Eliminar", key=f"del_{index_key}_{idx}_{row['ID_Registro']}", help="Eliminar registro"):
-                eliminar_registro(row['ID_Registro'], idx)
-                st.rerun()
-                
-        with c_btn2:
-            if row['Estado'] == 'Aprobado':
-                pdf_bytes = generar_pdf_nuevo(row.to_dict())
-                st.download_button("📥 PDF", data=pdf_bytes, file_name=f"Registro_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{idx}_{row['ID_Registro']}")
-
+        # 2. El botón desplegable debajo del cuadro para ver la información
         espaciador = " " * (1 if index_key == "pen" else 2 if index_key == "apr" else 3)
-        with st.expander(f"Ver detalles del registro #{row['ID_Registro']}{espaciador}"):
-            st.write(f"**Observaciones:** {row['Observaciones']} | **Fruta:** {row['Total_Fruta']} | **Unidades:** {row['Cant_Unidades']}")
-            st.write("---")
-            c_m1, c_m2, c_m3 = st.columns(3)
-            with c_m1: st.info(f"**M1:** Galón: {row['unidades_galon_1']} | Vol: {row['volumen_1']} | Brix: {row['brix_1']} | pH: {row['ph_1']}")
-            with c_m2: st.info(f"**M2:** Galón: {row['unidades_galon_2']} | Vol: {row['volumen_2']} | Brix: {row['brix_2']} | pH: {row['ph_2']}")
-            with c_m3: st.info(f"**M3:** Galón: {row['unidades_galon_3']} | Vol: {row['volumen_3']} | Brix: {row['brix_3']} | pH: {row['ph_3']}")
+        with st.expander(f"👁️ Ver toda la información{espaciador}"):
             
+            # --- INFO COMPLETA ---
+            st.write(f"**Observaciones:** {row['Observaciones']}")
+            st.write(f"**Total Fruta Ingresada Planta:** {row['Total_Fruta']} | **Cantidad Unidades (Muestra):** {row['Cant_Unidades']}")
+            st.markdown("---")
+            
+            st.markdown("#### Parámetros Fisicoquímicos")
+            c_m1, c_m2, c_m3 = st.columns(3)
+            with c_m1: st.info(f"**Muestra 1**\n\nGalón: {row['unidades_galon_1']}\n\nVol: {row['volumen_1']}\n\nBrix: {row['brix_1']}\n\npH: {row['ph_1']}")
+            with c_m2: st.info(f"**Muestra 2**\n\nGalón: {row['unidades_galon_2']}\n\nVol: {row['volumen_2']}\n\nBrix: {row['brix_2']}\n\npH: {row['ph_2']}")
+            with c_m3: st.info(f"**Muestra 3**\n\nGalón: {row['unidades_galon_3']}\n\nVol: {row['volumen_3']}\n\nBrix: {row['brix_3']}\n\npH: {row['ph_3']}")
+            
+            # --- ZONA DE FIRMA (IDÉNTICA A LA IMAGEN) ---
             if row['Estado'] == "Pendiente":
-                st.markdown("#### ✍️ Aprobar y Firmar")
+                st.markdown("---")
+                st.markdown("## Firma del Responsable")
+                st.warning(f"No hay una firma guardada para el Jefe de Calidad. Por favor dibújela abajo.")
+                st.write("Dibuje su firma en el recuadro:")
                 
-                # Se incorpora idx al canvas para garantizar una ID 100% única en todo el sistema
+                # Lienzo de firma (display_toolbar=True activa la barra negra inferior)
                 canvas_result = st_canvas(
-                    fill_color="rgba(255, 255, 255, 0)", stroke_width=2, stroke_color="#0f766e",
-                    background_color="#f8fafc", height=100, width=350, drawing_mode="freedraw",
+                    fill_color="rgba(255, 255, 255, 0)",
+                    stroke_width=2,
+                    stroke_color="#000000",
+                    background_color="#ffffff",
+                    height=200,
+                    width=600,
+                    drawing_mode="freedraw",
+                    display_toolbar=True, 
                     key=f"canvas_firma_{index_key}_{idx}_{row['ID_Registro']}"
                 )
                 
-                if st.button("Aprobar Registro", key=f"btn_aprobar_{index_key}_{idx}_{row['ID_Registro']}", type="primary"):
+                # Botón de guardar con el texto exacto de la imagen
+                if st.button("Guardar Registro de Recepción", key=f"btn_aprobar_{index_key}_{idx}_{row['ID_Registro']}", type="primary"):
                     if canvas_result.image_data is not None:
                         from PIL import Image
                         img = Image.fromarray(canvas_result.image_data.astype('uint8'), mode="RGBA")
                         nombre_firma = f"firma_{idx}_{row['ID_Registro']}.png"
                         img.save(os.path.join(FIRMAS_DIR, nombre_firma))
                         
-                        df.at[idx, 'Estado'] = "Aprobado"
-                        df.at[idx, 'Firma_Jefe'] = nombre_firma
-                        guardar_datos(df)
+                        df_update = cargar_datos()
+                        df_update.at[idx, 'Estado'] = "Aprobado"
+                        df_update.at[idx, 'Firma_Jefe'] = nombre_firma
+                        guardar_datos(df_update)
                         st.success("Registro aprobado correctamente.")
                         st.rerun()
+
+            st.markdown("---")
+            # --- BOTONES DE ACCIÓN EXTRA ---
+            col_act1, col_act2, col_act3 = st.columns([2, 2, 6])
+            with col_act1:
+                if st.button("🗑️ Eliminar Registro", key=f"del_{index_key}_{idx}_{row['ID_Registro']}"):
+                    eliminar_registro(row['ID_Registro'], idx)
+                    st.rerun()
+            with col_act2:
+                if row['Estado'] == 'Aprobado':
+                    pdf_bytes = generar_pdf_nuevo(row.to_dict())
+                    st.download_button("📥 Descargar PDF", data=pdf_bytes, file_name=f"Registro_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{idx}_{row['ID_Registro']}")
+                    
+        st.write("") # Pequeño espacio entre registros
 
     # --- PESTAÑA: PENDIENTES ---
     with tab_pendientes:
