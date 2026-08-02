@@ -123,16 +123,11 @@ def cargar_datos():
 def guardar_datos(df):
     df.to_excel(EXCEL_FILE, index=False)
 
-def eliminar_registro(id_registro, idx_excel):
+def eliminar_registro(id_registro):
     df = cargar_datos()
-    # Eliminamos por índice para asegurar que si hay IDs duplicados solo borremos el correcto
-    if idx_excel in df.index:
-        df = df.drop(index=idx_excel)
-    else:
-        # Fallback por si acaso
-        df = df[df["ID_Registro"] != id_registro]
+    df = df[df["ID_Registro"] != id_registro]
     guardar_datos(df)
-    st.success(f"Registro eliminado correctamente.")
+    st.success(f"Registro #{id_registro} eliminado.")
 
 def generar_excel_bytes(df):
     output = io.BytesIO()
@@ -305,6 +300,7 @@ elif st.session_state["nav_state"] == "form":
                 proveedor_final = st.text_input("Si eligió 'Otro', escriba el nombre:") if proveedor_opcion == "Otro" else proveedor_opcion
                 desc_materia = st.text_input("Materia prima", value="Coco")
             with c2:
+                # CORRECCIÓN ERROR 2 (MOBILE BUG): Agregar value por defecto y step=60 a time_input
                 fecha = st.date_input("Fecha", value=datetime.today())
                 hora = st.time_input("Hora", value=datetime.now().time(), step=60)
                 total_fruta = st.number_input("Total Fruta Ingresada", min_value=0.0, value=0.0)
@@ -366,8 +362,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
     tab_pendientes, tab_aprobados, tab_todos = st.tabs(["⏳ Pendientes", "✅ Aprobados", "📊 Todos"])
     
     # FUNCIONES DE RENDERIZADO DE TARJETAS
-    # ¡NUEVO!: Se agregó idx (índice de la fila) a todos los identificadores para evitar errores por duplicados en la base de datos
-    def render_tarjeta(row, index_key, idx):
+    def render_tarjeta(row, index_key):
         estado_icono = "⏳" if row['Estado'] == "Pendiente" else "✅"
         st.markdown(f"""
         <div class="record-card">
@@ -379,15 +374,17 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         c_btn1, c_btn2, c_btn3 = st.columns([2, 2, 8])
         
         with c_btn1:
-            if st.button("🗑️ Eliminar", key=f"del_{index_key}_{idx}_{row['ID_Registro']}", help="Eliminar registro"):
-                eliminar_registro(row['ID_Registro'], idx)
+            # CORRECCIÓN ERROR 1: Se incorpora el index_key (pen, apr, tod) a todos los identificadores (key)
+            if st.button("🗑️ Eliminar", key=f"del_{index_key}_{row['ID_Registro']}", help="Eliminar registro"):
+                eliminar_registro(row['ID_Registro'])
                 st.rerun()
                 
         with c_btn2:
             if row['Estado'] == 'Aprobado':
                 pdf_bytes = generar_pdf_nuevo(row.to_dict())
-                st.download_button("📥 PDF", data=pdf_bytes, file_name=f"Registro_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{idx}_{row['ID_Registro']}")
+                st.download_button("📥 PDF", data=pdf_bytes, file_name=f"Registro_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{row['ID_Registro']}")
 
+        # Evitamos conflicto en nombres de Expander añadiendo espacios invisibles condicionales
         espaciador = " " * (1 if index_key == "pen" else 2 if index_key == "apr" else 3)
         with st.expander(f"Ver detalles del registro #{row['ID_Registro']}{espaciador}"):
             st.write(f"**Observaciones:** {row['Observaciones']} | **Fruta:** {row['Total_Fruta']} | **Unidades:** {row['Cant_Unidades']}")
@@ -399,23 +396,22 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             
             if row['Estado'] == "Pendiente":
                 st.markdown("#### ✍️ Aprobar y Firmar")
-                
-                # Se incorpora idx al canvas para garantizar una ID 100% única en todo el sistema
+                # CORRECCIÓN ERROR 1: Key única para el Canvas
                 canvas_result = st_canvas(
                     fill_color="rgba(255, 255, 255, 0)", stroke_width=2, stroke_color="#0f766e",
                     background_color="#f8fafc", height=100, width=350, drawing_mode="freedraw",
-                    key=f"canvas_firma_{index_key}_{idx}_{row['ID_Registro']}"
+                    key=f"canvas_{index_key}_{row['ID_Registro']}"
                 )
-                
-                if st.button("Aprobar Registro", key=f"btn_aprobar_{index_key}_{idx}_{row['ID_Registro']}", type="primary"):
+                # CORRECCIÓN ERROR 1: Key única para el Botón de Aprobar
+                if st.button("Aprobar Registro", key=f"btn_aprobar_{index_key}_{row['ID_Registro']}", type="primary"):
                     if canvas_result.image_data is not None:
                         from PIL import Image
                         img = Image.fromarray(canvas_result.image_data.astype('uint8'), mode="RGBA")
-                        nombre_firma = f"firma_{idx}_{row['ID_Registro']}.png"
+                        nombre_firma = f"firma_{row['ID_Registro']}.png"
                         img.save(os.path.join(FIRMAS_DIR, nombre_firma))
                         
-                        df.at[idx, 'Estado'] = "Aprobado"
-                        df.at[idx, 'Firma_Jefe'] = nombre_firma
+                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Aprobado"
+                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Firma_Jefe'] = nombre_firma
                         guardar_datos(df)
                         st.success("Registro aprobado correctamente.")
                         st.rerun()
@@ -425,14 +421,14 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         df_pen = df[df["Estado"] == "Pendiente"]
         st.write(f"### Registros Pendientes ({len(df_pen)})")
         for idx, row in df_pen.iterrows():
-            render_tarjeta(row, "pen", idx)
+            render_tarjeta(row, "pen")
 
     # --- PESTAÑA: APROBADOS ---
     with tab_aprobados:
         df_apr = df[df["Estado"] == "Aprobado"]
         st.write(f"### Registros Aprobados ({len(df_apr)})")
         for idx, row in df_apr.iterrows():
-            render_tarjeta(row, "apr", idx)
+            render_tarjeta(row, "apr")
 
     # --- PESTAÑA: TODOS Y DESCARGA EXCEL ---
     with tab_todos:
@@ -459,4 +455,4 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         df_mostrar = df if prov_filtro == "Todos" else df[df["Proveedor"] == prov_filtro]
         
         for idx, row in df_mostrar.iterrows():
-            render_tarjeta(row, "tod", idx)
+            render_tarjeta(row, "tod")
