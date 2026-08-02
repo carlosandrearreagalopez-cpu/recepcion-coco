@@ -21,20 +21,18 @@ from reportlab.lib import colors
 # ==========================================
 # CONFIGURACIÓN Y ESTILOS (Colores LIF Brands)
 # ==========================================
-st.set_page_config(page_title="Control de Recepción - LIF Brands", layout="wide")
+st.set_page_config(page_title="Control de Recepción - LIF Brands", layout="wide", initial_sidebar_state="collapsed")
 
-# CSS Limpio: Evita interferir con los componentes internos de React / Emotion
 st.markdown("""
 <style>
-/* Fondo principal */
+/* Forzar colores claros y tipografía sin romper iconos internos (span) */
 .stApp { 
     background-color: #F8FAF9 !important; 
 }
 
-/* Tipografía general sin romper librerías CSS internas */
-html, body, p, span, label { 
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important; 
-    color: #1f2937 !important; 
+html, body, p, label, div { 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    color: #1f2937; 
 }
 
 h1, h2, h3, h4, h5, h6 { 
@@ -42,28 +40,26 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 700 !important; 
 }
 
-/* Estilos de Etiquetas */
-.stTextInput label, .stSelectbox label, .stDateInput label, .stNumberInput label, .stFileUploader label {
+/* Colores para las etiquetas de los inputs */
+.stTextInput label, .stSelectbox label, .stDateInput label, .stNumberInput label, .stFileUploader label, .stTextArea label {
     color: #0f766e !important;
     font-weight: bold !important;
 }
 
-/* Arreglo para que el Uploader de imágenes no se vea sobrepuesto */
-[data-testid="stFileUploader"] {
-    background-color: #ffffff;
-    border: 2px dashed #0f766e;
-    border-radius: 8px;
-    padding: 15px;
-    margin-top: 10px;
-    margin-bottom: 15px;
+/* Arreglo para Expander (Ver detalles) */
+[data-testid="stExpander"] details summary {
+    background-color: #f0fdf4 !important;
+    color: #115e59 !important;
+    font-weight: bold;
+    border-radius: 6px;
 }
-
-[data-testid="stFileUploader"] section {
-    padding: 0px !important;
+[data-testid="stExpander"] details summary p {
+    color: #115e59 !important;
+    font-weight: bold;
 }
 
 /* Botones Principales (Verde LIF) */
-button[kind="primary"] {
+[data-testid="baseButton-primary"] {
     background-color: #115e59 !important;
     color: #FFFFFF !important;
     border: none !important;
@@ -71,12 +67,12 @@ button[kind="primary"] {
     font-weight: bold !important;
 }
 
-button[kind="primary"]:hover {
+[data-testid="baseButton-primary"]:hover {
     background-color: #0f766e !important;
 }
 
 /* Botones Secundarios */
-.stButton>button {
+[data-testid="baseButton-secondary"] {
     background-color: #FFFFFF !important;
     color: #115e59 !important;
     border: 1px solid #115e59 !important;
@@ -84,32 +80,43 @@ button[kind="primary"]:hover {
     font-weight: bold;
 }
 
-/* Tarjetas (Cards) */
+[data-testid="baseButton-secondary"]:hover {
+    background-color: #f0fdf4 !important;
+}
+
+/* Tarjetas (Cards) de los registros */
 .record-card {
     background-color: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     padding: 16px;
-    margin-bottom: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     border-left: 5px solid #0f766e;
 }
 
 .record-header {
     font-size: 1.1em;
     font-weight: bold;
-    color: #1f2937;
+    color: #115e59;
     margin-bottom: 8px;
 }
 
 .record-sub {
-    color: #64748b;
+    color: #475569;
     font-size: 0.9em;
 }
 
 .status-pendiente { color: #d97706; font-weight: bold; }
 .status-aprobado { color: #16a34a; font-weight: bold; }
 .status-rechazado { color: #dc2626; font-weight: bold; }
+
+/* Borde visible para el área de dibujo de la firma */
+canvas {
+    border: 1px solid #94a3b8 !important;
+    border-radius: 6px;
+    cursor: crosshair;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -171,8 +178,7 @@ def generar_excel_bytes(df):
         if max_row > 1:
             ref = f"A1:{get_column_letter(max_col)}{max_row}"
             tab = Table(displayName="TablaRegistros", ref=ref)
-            style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False,
-                                   showLastColumn=False, showRowStripes=True, showColumnStripes=True)
+            style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=True)
             tab.tableStyleInfo = style
             worksheet.add_table(tab)
             
@@ -190,7 +196,7 @@ def generar_excel_bytes(df):
     return output.getvalue()
 
 # ==========================================
-# GENERADOR DE PDF (Formato Horizontal)
+# GENERADOR DE PDF
 # ==========================================
 def generar_pdf_nuevo(registro):
     buffer = io.BytesIO()
@@ -342,7 +348,7 @@ elif st.session_state["nav_state"] == "form":
     st.title("Registro de Recepción de Coco")
     
     if st.session_state["enviado_exitoso"]:
-        st.success("¡Registro enviado con éxito! Quedará pendiente de validación en el panel de Jefe de Calidad.")
+        st.success("¡Registro enviado con éxito! Quedará pendiente de validación.")
         if st.button("➕ Ingresar un nuevo registro", type="primary"):
             st.session_state["enviado_exitoso"] = False
             st.rerun()
@@ -357,7 +363,6 @@ elif st.session_state["nav_state"] == "form":
                 desc_materia = st.text_input("Materia prima", value="Coco")
             with c2:
                 fecha = st.date_input("Fecha", value=datetime.today())
-                # Reemplazo seguro de hora como texto para evitar el error React/Emotion en móviles
                 hora = st.text_input("Hora (HH:MM)", value=datetime.now().strftime("%H:%M"))
                 total_fruta = st.number_input("Total Fruta Ingresada", min_value=0.0, value=0.0)
                 cant_unidades = st.number_input("Unidades (Muestra)", min_value=0.0, value=0.0)
@@ -376,15 +381,12 @@ elif st.session_state["nav_state"] == "form":
 
             st.header("3. Evidencia Fotográfica")
             st.info("Adjunte una foto de la medición realizada (pH o Brix).")
-            
-            # File Uploader estilizado y compatible
-            evidencia_foto = st.file_uploader("Seleccionar imagen o tomar foto", type=["png", "jpg", "jpeg"], help="En móvil, toque aquí para tomar la foto directamente.")
+            evidencia_foto = st.file_uploader("Seleccionar imagen o tomar foto", type=["png", "jpg", "jpeg"])
 
             submitted = st.form_submit_button("Guardar y Enviar a Revisión", type="primary")
             
             if submitted:
                 id_nuevo = generar_id_registro()
-                
                 nombre_evidencia = ""
                 if evidencia_foto is not None:
                     img = Image.open(evidencia_foto)
@@ -458,15 +460,16 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         c_btn1, c_btn2, c_btn3 = st.columns([2, 2, 8])
         
         with c_btn1:
-            if st.button("🗑️ Eliminar", key=f"del_{index_key}_{row['ID_Registro']}", help="Eliminar registro permanentemente"):
+            if st.button("🗑️ Eliminar", key=f"del_{index_key}_{row['ID_Registro']}"):
                 eliminar_registro(row['ID_Registro'])
                 st.rerun()
                 
         with c_btn2:
             if row['Estado'] == 'Aprobado':
                 pdf_bytes = generar_pdf_nuevo(row.to_dict())
-                st.download_button("📥 Descargar PDF", data=pdf_bytes, file_name=f"Recepcion_Coco_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{row['ID_Registro']}")
+                st.download_button("📥 PDF", data=pdf_bytes, file_name=f"Recepcion_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{row['ID_Registro']}")
 
+        # Espacios invisibles para evitar conflicto de keys en los expanders
         espaciador = " " * (1 if index_key == "pen" else 2 if index_key == "apr" else 3 if index_key == "rec" else 4)
         with st.expander(f"Ver detalles del registro #{row['ID_Registro']}{espaciador}"):
             st.write(f"**Materia Prima:** {row['Desc_Materia']} | **Fruta:** {row['Total_Fruta']} | **Unidades:** {row['Cant_Unidades']}")
@@ -491,13 +494,22 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                 st.markdown("#### ✍️ Evaluación de Calidad")
                 obs_jefe = st.text_area("Añadir observaciones (Opcional):", key=f"obs_jefe_{row['ID_Registro']}")
                 
-                st.write("Firma de Aprobación (Obligatorio para aceptar):")
+                st.write("**Firma de Aprobación (Dibuje aquí):**")
+                
+                # Canvas corregido: fondo blanco sólido y update=False para evitar problemas de React
                 canvas_result = st_canvas(
-                    fill_color="rgba(255, 255, 255, 0)", stroke_width=2, stroke_color="#0f766e",
-                    background_color="#f8fafc", height=100, width=350, drawing_mode="freedraw",
+                    fill_color="#ffffff",
+                    stroke_width=2, 
+                    stroke_color="#115e59",
+                    background_color="#ffffff",
+                    height=120, 
+                    width=350, 
+                    drawing_mode="freedraw",
+                    update_streamlit=False,
                     key=f"canvas_{index_key}_{row['ID_Registro']}"
                 )
                 
+                st.markdown("<br>", unsafe_allow_html=True)
                 c_rev1, c_rev2 = st.columns(2)
                 with c_rev1:
                     if st.button("✅ Aprobar Registro", key=f"btn_aprobar_{row['ID_Registro']}", type="primary"):
@@ -510,17 +522,15 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                             df.loc[df['ID_Registro'] == row['ID_Registro'], 'Firma_Jefe'] = nombre_firma
                             df.loc[df['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = obs_jefe
                             guardar_datos(df)
-                            st.success("Registro Aprobado exitosamente.")
                             st.rerun()
                         else:
-                            st.error("Se requiere la firma para aprobar.")
+                            st.error("Dibuja tu firma en el recuadro para poder aprobar.")
                 
                 with c_rev2:
                     if st.button("❌ Rechazar Registro", key=f"btn_rechazar_{row['ID_Registro']}"):
                         df.loc[df['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Rechazado"
                         df.loc[df['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = obs_jefe
                         guardar_datos(df)
-                        st.warning("Registro Rechazado.")
                         st.rerun()
 
     # --- PESTAÑA: PENDIENTES ---
