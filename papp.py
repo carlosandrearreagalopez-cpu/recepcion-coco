@@ -23,26 +23,43 @@ from reportlab.lib import colors
 # ==========================================
 st.set_page_config(page_title="Control de Recepción - LIF Brands", layout="wide")
 
+# CSS Limpio: Evita interferir con los componentes internos de React / Emotion
 st.markdown("""
 <style>
-/* Forzar fondo blanco y texto oscuro para garantizar legibilidad */
-.stApp { background-color: #F8FAF9 !important; }
-html, body, [class*="css"], p, span, label, div { 
+/* Fondo principal */
+.stApp { 
+    background-color: #F8FAF9 !important; 
+}
+
+/* Tipografía general sin romper librerías CSS internas */
+html, body, p, span, label { 
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important; 
     color: #1f2937 !important; 
 }
-h1, h2, h3, h4, h5, h6 { color: #115e59 !important; font-weight: 700 !important; }
 
-/* Estilos de Inputs y Selects */
-.stTextInput label, .stSelectbox label, .stDateInput label, .stNumberInput label, .stRadio label, .stFileUploader label {
+h1, h2, h3, h4, h5, h6 { 
+    color: #115e59 !important; 
+    font-weight: 700 !important; 
+}
+
+/* Estilos de Etiquetas */
+.stTextInput label, .stSelectbox label, .stDateInput label, .stNumberInput label, .stFileUploader label {
     color: #0f766e !important;
     font-weight: bold !important;
 }
-input, select, textarea {
-    background-color: #ffffff !important;
-    color: #1f2937 !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 6px;
+
+/* Arreglo para que el Uploader de imágenes no se vea sobrepuesto */
+[data-testid="stFileUploader"] {
+    background-color: #ffffff;
+    border: 2px dashed #0f766e;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
+[data-testid="stFileUploader"] section {
+    padding: 0px !important;
 }
 
 /* Botones Principales (Verde LIF) */
@@ -53,9 +70,9 @@ button[kind="primary"] {
     border-radius: 6px !important;
     font-weight: bold !important;
 }
-button[kind="primary"]:hover, button[kind="primary"]:focus, button[kind="primary"]:active {
+
+button[kind="primary"]:hover {
     background-color: #0f766e !important;
-    color: #FFFFFF !important;
 }
 
 /* Botones Secundarios */
@@ -66,12 +83,8 @@ button[kind="primary"]:hover, button[kind="primary"]:focus, button[kind="primary
     border-radius: 6px !important;
     font-weight: bold;
 }
-.stButton>button:hover, .stButton>button:focus, .stButton>button:active {
-    background-color: #f0fdf4 !important;
-    color: #115e59 !important;
-}
 
-/* Tarjetas (Cards) de Registros */
+/* Tarjetas (Cards) */
 .record-card {
     background-color: #ffffff;
     border: 1px solid #e2e8f0;
@@ -81,34 +94,22 @@ button[kind="primary"]:hover, button[kind="primary"]:focus, button[kind="primary
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     border-left: 5px solid #0f766e;
 }
+
 .record-header {
     font-size: 1.1em;
     font-weight: bold;
     color: #1f2937;
     margin-bottom: 8px;
 }
+
 .record-sub {
     color: #64748b;
     font-size: 0.9em;
 }
 
-/* Status Colors */
 .status-pendiente { color: #d97706; font-weight: bold; }
 .status-aprobado { color: #16a34a; font-weight: bold; }
 .status-rechazado { color: #dc2626; font-weight: bold; }
-
-/* Expanders */
-.streamlit-expanderHeader {
-    color: #0f766e !important;
-    background-color: #f8fafc !important;
-    border-radius: 4px;
-    font-weight: bold !important;
-}
-.streamlit-expanderContent {
-    background-color: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-top: none !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -356,7 +357,8 @@ elif st.session_state["nav_state"] == "form":
                 desc_materia = st.text_input("Materia prima", value="Coco")
             with c2:
                 fecha = st.date_input("Fecha", value=datetime.today())
-                hora = st.time_input("Hora", value=datetime.now().time(), step=60)
+                # Reemplazo seguro de hora como texto para evitar el error React/Emotion en móviles
+                hora = st.text_input("Hora (HH:MM)", value=datetime.now().strftime("%H:%M"))
                 total_fruta = st.number_input("Total Fruta Ingresada", min_value=0.0, value=0.0)
                 cant_unidades = st.number_input("Unidades (Muestra)", min_value=0.0, value=0.0)
             
@@ -373,10 +375,10 @@ elif st.session_state["nav_state"] == "form":
                 with mc4: muestras_datos[f"ph_{i}"] = st.number_input(f"pH (M{i})", min_value=0.0, value=0.0, format="%.2f")
 
             st.header("3. Evidencia Fotográfica")
-            st.info("Suba o tome una foto de la medición realizada (pH o Brix).")
+            st.info("Adjunte una foto de la medición realizada (pH o Brix).")
             
-            # Cargar archivo/foto directamente desde el formulario (sin errores de React)
-            evidencia_foto = st.file_uploader("Cargar imagen de evidencia", type=["png", "jpg", "jpeg"])
+            # File Uploader estilizado y compatible
+            evidencia_foto = st.file_uploader("Seleccionar imagen o tomar foto", type=["png", "jpg", "jpeg"], help="En móvil, toque aquí para tomar la foto directamente.")
 
             submitted = st.form_submit_button("Guardar y Enviar a Revisión", type="primary")
             
