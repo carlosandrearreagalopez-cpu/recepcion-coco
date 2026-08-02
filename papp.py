@@ -138,7 +138,6 @@ def mostrar_logo(ancho=160):
 def cargar_datos():
     if os.path.exists(EXCEL_FILE):
         df = pd.read_excel(EXCEL_FILE, dtype={"ID_Registro": str})
-        # Asegurar columnas obligatorias para evitar errores de tipo si el archivo es antiguo
         columnas_requeridas = {
             "ID_Registro": "",
             "Estado": "Pendiente",
@@ -157,6 +156,11 @@ def cargar_datos():
         for col, val_default in columnas_requeridas.items():
             if col not in df.columns:
                 df[col] = val_default
+        
+        # Forzar tipos de columnas críticas como string para evitar errores en Pandas
+        df["Observaciones_Jefe"] = df["Observaciones_Jefe"].astype(str)
+        df["Estado"] = df["Estado"].astype(str)
+        df["Firma_Jefe"] = df["Firma_Jefe"].astype(str)
         return df
     return pd.DataFrame()
 
@@ -416,15 +420,20 @@ elif st.session_state["nav_state"] == "form":
 
                 prov = proveedor_final if proveedor_opcion == "Otro" else proveedor_opcion
                 nuevo_registro = {
-                    "ID_Registro": id_nuevo,
+                    "ID_Registro": str(id_nuevo),
                     "Estado": "Pendiente",
-                    "Responsable": responsable, "Fecha": str(fecha), "Hora": str(hora),
-                    "Desc_Materia": desc_materia, "Observaciones": observaciones,
-                    "Proveedor": prov, "Total_Fruta": total_fruta, "Cant_Unidades": cant_unidades,
-                    "unidades_galon_1": muestras_datos["ug_1"], "volumen_1": muestras_datos["v_1"], "brix_1": muestras_datos["b_1"], "ph_1": muestras_datos["ph_1"],
-                    "unidades_galon_2": muestras_datos["ug_2"], "volumen_2": muestras_datos["v_2"], "brix_2": muestras_datos["b_2"], "ph_2": muestras_datos["ph_2"],
-                    "unidades_galon_3": muestras_datos["ug_3"], "volumen_3": muestras_datos["v_3"], "brix_3": muestras_datos["b_3"], "ph_3": muestras_datos["ph_3"],
-                    "Evidencia": nombre_evidencia,
+                    "Responsable": str(responsable), 
+                    "Fecha": str(fecha), 
+                    "Hora": str(hora),
+                    "Desc_Materia": str(desc_materia), 
+                    "Observaciones": str(observaciones),
+                    "Proveedor": str(prov), 
+                    "Total_Fruta": float(total_fruta), 
+                    "Cant_Unidades": float(cant_unidades),
+                    "unidades_galon_1": float(muestras_datos["ug_1"]), "volumen_1": float(muestras_datos["v_1"]), "brix_1": float(muestras_datos["b_1"]), "ph_1": float(muestras_datos["ph_1"]),
+                    "unidades_galon_2": float(muestras_datos["ug_2"]), "volumen_2": float(muestras_datos["v_2"]), "brix_2": float(muestras_datos["b_2"]), "ph_2": float(muestras_datos["ph_2"]),
+                    "unidades_galon_3": float(muestras_datos["ug_3"]), "volumen_3": float(muestras_datos["v_3"]), "brix_3": float(muestras_datos["b_3"]), "ph_3": float(muestras_datos["ph_3"]),
+                    "Evidencia": str(nombre_evidencia),
                     "Firma_Jefe": "Sin firma",
                     "Observaciones_Jefe": ""
                 }
@@ -467,7 +476,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
     
     def render_tarjeta(row, index_key, allow_review=False):
         estado_icono = "⏳" if row['Estado'] == "Pendiente" else "✅" if row['Estado'] == "Aprobado" else "❌"
-        css_class = f"status-{row['Estado'].lower()}"
+        css_class = f"status-{str(row['Estado']).lower()}"
         
         st.markdown(f"""
         <div class="record-card">
@@ -505,7 +514,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                     st.write("**Evidencia Fotográfica:**")
                     st.image(ruta_evidencia, width=350)
             
-            if row.get("Observaciones_Jefe", "") != "":
+            if pd.notna(row.get("Observaciones_Jefe", "")) and str(row.get("Observaciones_Jefe", "")) != "":
                 st.warning(f"**Observaciones de Calidad:** {row['Observaciones_Jefe']}")
             
             if allow_review and row['Estado'] == "Pendiente":
@@ -563,11 +572,16 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                                 st.error("Debe proporcionar o dibujar una firma válida.")
                                 st.stop()
 
-                        # Recargar datos frescos antes de actualizar para prevenir conflictos
+                        # Recargar datos frescos y forzar tipos string en las columnas antes de actualizar
                         df_act = cargar_datos()
-                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Aprobado"
-                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Firma_Jefe'] = nombre_firma_archivo
-                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = str(obs_jefe)
+                        df_act["Estado"] = df_act["Estado"].astype(str)
+                        df_act["Firma_Jefe"] = df_act["Firma_Jefe"].astype(str)
+                        df_act["Observaciones_Jefe"] = df_act["Observaciones_Jefe"].astype(str)
+
+                        df_act.loc[df_act['ID_Registro'] == str(row['ID_Registro']), 'Estado'] = "Aprobado"
+                        df_act.loc[df_act['ID_Registro'] == str(row['ID_Registro']), 'Firma_Jefe'] = str(nombre_firma_archivo)
+                        df_act.loc[df_act['ID_Registro'] == str(row['ID_Registro']), 'Observaciones_Jefe'] = str(obs_jefe)
+                        
                         guardar_datos(df_act)
                         st.success("Registro Aprobado exitosamente.")
                         st.rerun()
@@ -575,8 +589,12 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                 with c_rev2:
                     if st.button("❌ Rechazar Registro", key=f"btn_rechazar_{row['ID_Registro']}"):
                         df_act = cargar_datos()
-                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Rechazado"
-                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = str(obs_jefe)
+                        df_act["Estado"] = df_act["Estado"].astype(str)
+                        df_act["Observaciones_Jefe"] = df_act["Observaciones_Jefe"].astype(str)
+
+                        df_act.loc[df_act['ID_Registro'] == str(row['ID_Registro']), 'Estado'] = "Rechazado"
+                        df_act.loc[df_act['ID_Registro'] == str(row['ID_Registro']), 'Observaciones_Jefe'] = str(obs_jefe)
+                        
                         guardar_datos(df_act)
                         st.warning("Registro Rechazado.")
                         st.rerun()
