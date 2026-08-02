@@ -34,7 +34,7 @@ html, body, [class*="css"], p, span, label, div {
 h1, h2, h3, h4, h5, h6 { color: #115e59 !important; font-weight: 700 !important; }
 
 /* Estilos de Inputs y Selects */
-.stTextInput label, .stSelectbox label, .stDateInput label, .stNumberInput label, .stRadio label, .stFileUploader label, .stCameraInput label {
+.stTextInput label, .stSelectbox label, .stDateInput label, .stNumberInput label, .stRadio label, .stFileUploader label {
     color: #0f766e !important;
     font-weight: bold !important;
 }
@@ -130,7 +130,6 @@ def mostrar_logo(ancho=160):
 
 def cargar_datos():
     if os.path.exists(EXCEL_FILE):
-        # Forzar que el ID_Registro sea tratado como texto para evitar problemas con "(1)"
         return pd.read_excel(EXCEL_FILE, dtype={"ID_Registro": str})
     return pd.DataFrame()
 
@@ -144,7 +143,6 @@ def eliminar_registro(id_registro):
     st.success(f"Registro #{id_registro} eliminado.")
 
 def generar_id_registro():
-    """Genera ID basado en AÑOMESDIA y agrega sufijos si existen duplicados el mismo día."""
     fecha_base = datetime.today().strftime("%Y%m%d")
     df = cargar_datos()
     
@@ -161,7 +159,6 @@ def generar_id_registro():
     return f"{fecha_base}({contador})"
 
 def generar_excel_bytes(df):
-    """Genera un archivo Excel con formato de Tabla de Excel nativa."""
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Registros')
@@ -171,7 +168,6 @@ def generar_excel_bytes(df):
         max_col = worksheet.max_column
         
         if max_row > 1:
-            # Convertir rango a formato de tabla de Excel
             ref = f"A1:{get_column_letter(max_col)}{max_row}"
             tab = Table(displayName="TablaRegistros", ref=ref)
             style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False,
@@ -179,7 +175,6 @@ def generar_excel_bytes(df):
             tab.tableStyleInfo = style
             worksheet.add_table(tab)
             
-            # Ajustar ancho de columnas
             for col in worksheet.columns:
                 max_length = 0
                 column = col[0].column_letter
@@ -378,18 +373,21 @@ elif st.session_state["nav_state"] == "form":
                 with mc4: muestras_datos[f"ph_{i}"] = st.number_input(f"pH (M{i})", min_value=0.0, value=0.0, format="%.2f")
 
             st.header("3. Evidencia Fotográfica")
-            st.info("Tome o suba una foto de una de las mediciones (pH o Brix) que haya realizado.")
-            evidencia_foto = st.camera_input("Capturar evidencia")
+            st.info("Suba o tome una foto de la medición realizada (pH o Brix).")
+            
+            # Cargar archivo/foto directamente desde el formulario (sin errores de React)
+            evidencia_foto = st.file_uploader("Cargar imagen de evidencia", type=["png", "jpg", "jpeg"])
 
             submitted = st.form_submit_button("Guardar y Enviar a Revisión", type="primary")
             
             if submitted:
                 id_nuevo = generar_id_registro()
                 
-                # Guardar evidencia si existe
                 nombre_evidencia = ""
                 if evidencia_foto is not None:
                     img = Image.open(evidencia_foto)
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
                     nombre_evidencia = f"evidencia_{id_nuevo}.jpg"
                     img.save(os.path.join(EVIDENCIAS_DIR, nombre_evidencia))
 
@@ -432,7 +430,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             
     df = cargar_datos()
     
-    # Contadores
     total_pen = len(df[df["Estado"] == "Pendiente"]) if not df.empty else 0
     total_apr = len(df[df["Estado"] == "Aprobado"]) if not df.empty else 0
     total_rec = len(df[df["Estado"] == "Rechazado"]) if not df.empty else 0
@@ -470,18 +467,15 @@ elif st.session_state["nav_state"] == "admin_dashboard":
 
         espaciador = " " * (1 if index_key == "pen" else 2 if index_key == "apr" else 3 if index_key == "rec" else 4)
         with st.expander(f"Ver detalles del registro #{row['ID_Registro']}{espaciador}"):
-            # Detalles Básicos
             st.write(f"**Materia Prima:** {row['Desc_Materia']} | **Fruta:** {row['Total_Fruta']} | **Unidades:** {row['Cant_Unidades']}")
             st.write(f"**Observaciones del Colaborador:** {row['Observaciones']}")
             st.write("---")
             
-            # Mediciones
             c_m1, c_m2, c_m3 = st.columns(3)
             with c_m1: st.info(f"**M1:** Galón: {row['unidades_galon_1']} | Vol: {row['volumen_1']} | Brix: {row['brix_1']} | pH: {row['ph_1']}")
             with c_m2: st.info(f"**M2:** Galón: {row['unidades_galon_2']} | Vol: {row['volumen_2']} | Brix: {row['brix_2']} | pH: {row['ph_2']}")
             with c_m3: st.info(f"**M3:** Galón: {row['unidades_galon_3']} | Vol: {row['volumen_3']} | Brix: {row['brix_3']} | pH: {row['ph_3']}")
             
-            # Evidencia
             if "Evidencia" in row and pd.notna(row["Evidencia"]) and row["Evidencia"] != "":
                 ruta_evidencia = os.path.join(EVIDENCIAS_DIR, str(row["Evidencia"]))
                 if os.path.exists(ruta_evidencia):
@@ -491,7 +485,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             if row.get("Observaciones_Jefe", "") != "":
                 st.warning(f"**Observaciones de Calidad:** {row['Observaciones_Jefe']}")
             
-            # Formulario de revisión y firma si se permite (Pendientes)
             if allow_review and row['Estado'] == "Pendiente":
                 st.markdown("#### ✍️ Evaluación de Calidad")
                 obs_jefe = st.text_area("Añadir observaciones (Opcional):", key=f"obs_jefe_{row['ID_Registro']}")
@@ -535,7 +528,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             for idx, row in df_pen.iterrows():
                 render_tarjeta(row, "pen", allow_review=True)
         else:
-            st.info("No hay registros en el sistema.")
+            st.info("No hay registros pendientes.")
 
     # --- PESTAÑA: APROBADOS ---
     with tab_aprobados:
@@ -566,7 +559,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             with cf1:
                 prov_filtro = st.selectbox("Filtrar por Proveedor:", ["Todos"] + list(df["Proveedor"].unique()), key="filter_prov")
             with cf2:
-                # Extraer las fechas únicas de los registros
                 fechas_unicas = ["Todas"] + list(df["Fecha"].unique())
                 fecha_filtro = st.selectbox("Filtrar por Fecha:", fechas_unicas, key="filter_fecha")
             
