@@ -111,11 +111,9 @@ h1, h2, h3, h4, h5, h6 {
 .status-aprobado { color: #16a34a; font-weight: bold; }
 .status-rechazado { color: #dc2626; font-weight: bold; }
 
-/* Borde visible para el área de dibujo de la firma */
-canvas {
-    border: 1px solid #94a3b8 !important;
-    border-radius: 6px;
-    cursor: crosshair;
+canvas.lower-canvas, canvas.upper-canvas {
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -124,9 +122,10 @@ canvas {
 # DIRECTORIOS Y FUNCIONES BASE
 # ==========================================
 FIRMAS_DIR = "firmas_recepcion"
+FIRMAS_REGISTRADAS_DIR = "firmas_registradas_jefes"
 EVIDENCIAS_DIR = "evidencias_recepcion"
 
-for directorio in [FIRMAS_DIR, EVIDENCIAS_DIR]:
+for directorio in [FIRMAS_DIR, FIRMAS_REGISTRADAS_DIR, EVIDENCIAS_DIR]:
     if not os.path.exists(directorio):
         os.makedirs(directorio)
 
@@ -469,7 +468,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                 pdf_bytes = generar_pdf_nuevo(row.to_dict())
                 st.download_button("📥 PDF", data=pdf_bytes, file_name=f"Recepcion_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{row['ID_Registro']}")
 
-        # Espacios invisibles para evitar conflicto de keys en los expanders
         espaciador = " " * (1 if index_key == "pen" else 2 if index_key == "apr" else 3 if index_key == "rec" else 4)
         with st.expander(f"Ver detalles del registro #{row['ID_Registro']}{espaciador}"):
             st.write(f"**Materia Prima:** {row['Desc_Materia']} | **Fruta:** {row['Total_Fruta']} | **Unidades:** {row['Cant_Unidades']}")
@@ -491,46 +489,74 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                 st.warning(f"**Observaciones de Calidad:** {row['Observaciones_Jefe']}")
             
             if allow_review and row['Estado'] == "Pendiente":
-                st.markdown("#### ✍️ Evaluación de Calidad")
+                st.markdown("---")
+                st.markdown("### Firma del Responsable (Jefe de Calidad)")
+                
+                # Nombre del jefe simulado o fijo para buscar su firma guardada
+                nombre_jefe = "Jefe de Calidad"
+                safe_name = nombre_jefe.replace(" ", "_").lower()
+                firma_path_guardada = os.path.join(FIRMAS_REGISTRADAS_DIR, f"firma_reg_{safe_name}.png")
+                tiene_firma_previa = os.path.exists(firma_path_guardada)
+
+                modo_firma = "Usar firma guardada"
+                if tiene_firma_previa:
+                    st.info(f"Se encontró una firma registrada previamente para **{nombre_jefe}**.")
+                    st.image(firma_path_guardada, width=300, caption=f"Firma asociada a {nombre_jefe}")
+                    modo_firma = st.radio("Seleccione opción de firma", ["Usar firma guardada", "Dibujar nueva firma"], horizontal=True, key=f"radio_firma_{row['ID_Registro']}")
+                else:
+                    st.warning(f"No hay una firma guardada para **{nombre_jefe}**. Por favor dibújela (se guardará automáticamente para futuros registros).")
+                    modo_firma = "Dibujar nueva firma"
+
+                canvas_result = None
+                if modo_firma == "Dibujar nueva firma":
+                    st.markdown("Dibuje su firma en el recuadro:")
+                    canvas_result = st_canvas(
+                        fill_color="rgba(101, 163, 13, 0.3)",
+                        stroke_width=2,
+                        stroke_color="#1e3a8a",
+                        background_color="#FFFFFF",
+                        height=150,
+                        width=500,
+                        drawing_mode="freedraw",
+                        key=f"canvas_firma_{row['ID_Registro']}",
+                    )
+
                 obs_jefe = st.text_area("Añadir observaciones (Opcional):", key=f"obs_jefe_{row['ID_Registro']}")
-                
-                st.write("**Firma de Aprobación (Dibuje aquí):**")
-                
-                # Canvas corregido: fondo blanco sólido y update=False para evitar problemas de React
-                canvas_result = st_canvas(
-                    fill_color="#ffffff",
-                    stroke_width=2, 
-                    stroke_color="#115e59",
-                    background_color="#ffffff",
-                    height=120, 
-                    width=350, 
-                    drawing_mode="freedraw",
-                    update_streamlit=False,
-                    key=f"canvas_{index_key}_{row['ID_Registro']}"
-                )
-                
                 st.markdown("<br>", unsafe_allow_html=True)
+                
                 c_rev1, c_rev2 = st.columns(2)
                 with c_rev1:
                     if st.button("✅ Aprobar Registro", key=f"btn_aprobar_{row['ID_Registro']}", type="primary"):
-                        if canvas_result.image_data is not None:
-                            img = Image.fromarray(canvas_result.image_data.astype('uint8'), mode="RGBA")
-                            nombre_firma = f"firma_{row['ID_Registro']}.png"
-                            img.save(os.path.join(FIRMAS_DIR, nombre_firma))
-                            
-                            df.loc[df['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Aprobado"
-                            df.loc[df['ID_Registro'] == row['ID_Registro'], 'Firma_Jefe'] = nombre_firma
-                            df.loc[df['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = obs_jefe
-                            guardar_datos(df)
-                            st.rerun()
+                        nombre_firma_archivo = f"firma_{row['ID_Registro']}.png"
+                        ruta_destino_registro = os.path.join(FIRMAS_DIR, nombre_firma_archivo)
+                        
+                        if modo_firma == "Usar firma guardada" and tiene_firma_previa:
+                            # Copiar la firma guardada al directorio del registro actual
+                            img_previa = Image.open(firma_path_guardada)
+                            img_previa.save(ruta_destino_registro)
                         else:
-                            st.error("Dibuja tu firma en el recuadro para poder aprobar.")
+                            # Guardar la nueva firma dibujada tanto para el registro como predeterminada del jefe
+                            if canvas_result is not None and canvas_result.image_data is not None:
+                                img = Image.fromarray(canvas_result.image_data.astype('uint8'), mode="RGBA")
+                                img.save(ruta_destino_registro)
+                                img.save(firma_path_guardada) # Guardar para futuros registros
+                            else:
+                                st.error("Debe proporcionar o dibujar una firma válida.")
+                                st.stop()
+
+                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Aprobado"
+                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Firma_Jefe'] = nombre_firma_archivo
+                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = obs_jefe
+                        guardar_datos(df)
+                        st.success("Registro Aprobado exitosamente.")
+                        st.rerun()
                 
                 with c_rev2:
                     if st.button("❌ Rechazar Registro", key=f"btn_rechazar_{row['ID_Registro']}"):
                         df.loc[df['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Rechazado"
                         df.loc[df['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = obs_jefe
                         guardar_datos(df)
+                        st.warning("Registro Rechazado.")
                         st.rerun()
 
     # --- PESTAÑA: PENDIENTES ---
