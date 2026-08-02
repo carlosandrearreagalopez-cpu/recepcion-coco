@@ -60,7 +60,7 @@ button[kind="primary"]:hover {
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     padding: 16px;
-    margin-bottom: 5px; /* Reducido para que pegue con el expander */
+    margin-bottom: 5px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     border-left: 5px solid #0f766e;
 }
@@ -107,7 +107,13 @@ def mostrar_logo(ancho=160):
 
 def cargar_datos():
     if os.path.exists(EXCEL_FILE):
-        return pd.read_excel(EXCEL_FILE)
+        df = pd.read_excel(EXCEL_FILE)
+        # Asegurar columnas obligatorias si el Excel es antiguo o le faltan
+        if "Estado" not in df.columns:
+            df["Estado"] = "Pendiente"
+        if "Firma_Jefe" not in df.columns:
+            df["Firma_Jefe"] = "Sin firma"
+        return df
     return pd.DataFrame()
 
 def guardar_datos(df):
@@ -353,11 +359,9 @@ elif st.session_state["nav_state"] == "admin_dashboard":
     
     tab_pendientes, tab_aprobados, tab_todos = st.tabs(["⏳ Pendientes", "✅ Aprobados", "📊 Todos"])
     
-    # FUNCIONES DE RENDERIZADO DE TARJETAS REDISEÑADAS
     def render_tarjeta(row, index_key, idx):
         estado_icono = "⏳" if row['Estado'] == "Pendiente" else "✅"
         
-        # 1. El cuadro visible inicial (Cabecera)
         st.markdown(f"""
         <div class="record-card">
             <div class="record-header">{estado_icono} #{row['ID_Registro']} — {row['Proveedor']}</div>
@@ -365,11 +369,9 @@ elif st.session_state["nav_state"] == "admin_dashboard":
         </div>
         """, unsafe_allow_html=True)
         
-        # 2. El botón desplegable debajo del cuadro para ver la información
         espaciador = " " * (1 if index_key == "pen" else 2 if index_key == "apr" else 3)
         with st.expander(f"👁️ Ver toda la información{espaciador}"):
             
-            # --- INFO COMPLETA ---
             st.write(f"**Observaciones:** {row['Observaciones']}")
             st.write(f"**Total Fruta Ingresada Planta:** {row['Total_Fruta']} | **Cantidad Unidades (Muestra):** {row['Cant_Unidades']}")
             st.markdown("---")
@@ -380,14 +382,12 @@ elif st.session_state["nav_state"] == "admin_dashboard":
             with c_m2: st.info(f"**Muestra 2**\n\nGalón: {row['unidades_galon_2']}\n\nVol: {row['volumen_2']}\n\nBrix: {row['brix_2']}\n\npH: {row['ph_2']}")
             with c_m3: st.info(f"**Muestra 3**\n\nGalón: {row['unidades_galon_3']}\n\nVol: {row['volumen_3']}\n\nBrix: {row['brix_3']}\n\npH: {row['ph_3']}")
             
-            # --- ZONA DE FIRMA (IDÉNTICA A LA IMAGEN) ---
             if row['Estado'] == "Pendiente":
                 st.markdown("---")
                 st.markdown("## Firma del Responsable")
                 st.warning(f"No hay una firma guardada para el Jefe de Calidad. Por favor dibújela abajo.")
                 st.write("Dibuje su firma en el recuadro:")
                 
-                # Lienzo de firma (display_toolbar=True activa la barra negra inferior)
                 canvas_result = st_canvas(
                     fill_color="rgba(255, 255, 255, 0)",
                     stroke_width=2,
@@ -400,7 +400,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                     key=f"canvas_firma_{index_key}_{idx}_{row['ID_Registro']}"
                 )
                 
-                # Botón de guardar con el texto exacto de la imagen
                 if st.button("Guardar Registro de Recepción", key=f"btn_aprobar_{index_key}_{idx}_{row['ID_Registro']}", type="primary"):
                     if canvas_result.image_data is not None:
                         from PIL import Image
@@ -416,7 +415,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                         st.rerun()
 
             st.markdown("---")
-            # --- BOTONES DE ACCIÓN EXTRA ---
             col_act1, col_act2, col_act3 = st.columns([2, 2, 6])
             with col_act1:
                 if st.button("🗑️ Eliminar Registro", key=f"del_{index_key}_{idx}_{row['ID_Registro']}"):
@@ -427,7 +425,7 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                     pdf_bytes = generar_pdf_nuevo(row.to_dict())
                     st.download_button("📥 Descargar PDF", data=pdf_bytes, file_name=f"Registro_{row['ID_Registro']}.pdf", mime="application/pdf", key=f"pdf_{index_key}_{idx}_{row['ID_Registro']}")
                     
-        st.write("") # Pequeño espacio entre registros
+        st.write("")
 
     # --- PESTAÑA: PENDIENTES ---
     with tab_pendientes:
