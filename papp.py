@@ -137,7 +137,27 @@ def mostrar_logo(ancho=160):
 
 def cargar_datos():
     if os.path.exists(EXCEL_FILE):
-        return pd.read_excel(EXCEL_FILE, dtype={"ID_Registro": str})
+        df = pd.read_excel(EXCEL_FILE, dtype={"ID_Registro": str})
+        # Asegurar columnas obligatorias para evitar errores de tipo si el archivo es antiguo
+        columnas_requeridas = {
+            "ID_Registro": "",
+            "Estado": "Pendiente",
+            "Responsable": "",
+            "Fecha": "",
+            "Hora": "",
+            "Desc_Materia": "Coco",
+            "Observaciones": "Ninguna",
+            "Proveedor": "",
+            "Total_Fruta": 0.0,
+            "Cant_Unidades": 0.0,
+            "Evidencia": "",
+            "Firma_Jefe": "Sin firma",
+            "Observaciones_Jefe": ""
+        }
+        for col, val_default in columnas_requeridas.items():
+            if col not in df.columns:
+                df[col] = val_default
+        return df
     return pd.DataFrame()
 
 def guardar_datos(df):
@@ -492,7 +512,6 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                 st.markdown("---")
                 st.markdown("### Firma del Responsable (Jefe de Calidad)")
                 
-                # Nombre del jefe simulado o fijo para buscar su firma guardada
                 nombre_jefe = "Jefe de Calidad"
                 safe_name = nombre_jefe.replace(" ", "_").lower()
                 firma_path_guardada = os.path.join(FIRMAS_REGISTRADAS_DIR, f"firma_reg_{safe_name}.png")
@@ -531,31 +550,34 @@ elif st.session_state["nav_state"] == "admin_dashboard":
                         ruta_destino_registro = os.path.join(FIRMAS_DIR, nombre_firma_archivo)
                         
                         if modo_firma == "Usar firma guardada" and tiene_firma_previa:
-                            # Copiar la firma guardada al directorio del registro actual
                             img_previa = Image.open(firma_path_guardada)
+                            if img_previa.mode != 'RGB':
+                                img_previa = img_previa.convert('RGB')
                             img_previa.save(ruta_destino_registro)
                         else:
-                            # Guardar la nueva firma dibujada tanto para el registro como predeterminada del jefe
                             if canvas_result is not None and canvas_result.image_data is not None:
-                                img = Image.fromarray(canvas_result.image_data.astype('uint8'), mode="RGBA")
+                                img = Image.fromarray(canvas_result.image_data.astype('uint8'), mode="RGB")
                                 img.save(ruta_destino_registro)
-                                img.save(firma_path_guardada) # Guardar para futuros registros
+                                img.save(firma_path_guardada)
                             else:
                                 st.error("Debe proporcionar o dibujar una firma válida.")
                                 st.stop()
 
-                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Aprobado"
-                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Firma_Jefe'] = nombre_firma_archivo
-                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = obs_jefe
-                        guardar_datos(df)
+                        # Recargar datos frescos antes de actualizar para prevenir conflictos
+                        df_act = cargar_datos()
+                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Aprobado"
+                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Firma_Jefe'] = nombre_firma_archivo
+                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = str(obs_jefe)
+                        guardar_datos(df_act)
                         st.success("Registro Aprobado exitosamente.")
                         st.rerun()
                 
                 with c_rev2:
                     if st.button("❌ Rechazar Registro", key=f"btn_rechazar_{row['ID_Registro']}"):
-                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Rechazado"
-                        df.loc[df['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = obs_jefe
-                        guardar_datos(df)
+                        df_act = cargar_datos()
+                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Estado'] = "Rechazado"
+                        df_act.loc[df_act['ID_Registro'] == row['ID_Registro'], 'Observaciones_Jefe'] = str(obs_jefe)
+                        guardar_datos(df_act)
                         st.warning("Registro Rechazado.")
                         st.rerun()
 
